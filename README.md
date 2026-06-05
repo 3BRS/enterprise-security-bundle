@@ -154,4 +154,4 @@ If you build a Symfony-only or Laminas integration on top of this bundle, please
 
 ## License
 
-MIT
+[MIT](LICENSE)
