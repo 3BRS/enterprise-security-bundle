@@ -1,0 +1,229 @@
+services:
+    _defaults:
+        autowire: false
+        autoconfigure: false
+        public: false
+
+    # Twig extensions
+
+    ThreeBRS\EnterpriseSecurityBundle\Twig\MagicLinkExtension:
+        arguments:
+            $features: '@ThreeBRS\EnterpriseSecurityBundle\Settings\FeatureToggle'
+        tags:
+            - { name: 'twig.extension' }
+
+    ThreeBRS\EnterpriseSecurityBundle\Twig\PasskeyExtension:
+        arguments:
+            $features: '@ThreeBRS\EnterpriseSecurityBundle\Settings\FeatureToggle'
+        tags:
+            - { name: 'twig.extension' }
+
+    ThreeBRS\EnterpriseSecurityBundle\Twig\SocialProvidersExtension:
+        arguments:
+            $registry: '@ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderRegistry'
+        tags:
+            - { name: 'twig.extension' }
+
+    # Password policy
+
+    ThreeBRS\EnterpriseSecurityBundle\PasswordPolicy\PasswordPolicyFilteringValidator:
+        arguments:
+            $inner: '@ThreeBRS\EnterpriseSecurityBundle\PasswordPolicy\PasswordPolicyFilteringValidator.inner'
+        decorates: validator
+
+    # Password history
+
+    ThreeBRS\EnterpriseSecurityBundle\PasswordHistory\PasswordSimilarityChecker: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\PasswordHistory\PasswordSimilarityCheckerInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\PasswordHistory\PasswordSimilarityChecker
+
+    # Password expiration
+
+    ThreeBRS\EnterpriseSecurityBundle\PasswordExpiration\PasswordExpirationChecker:
+        arguments:
+            $settings: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+
+    # Two-factor authentication
+
+    ThreeBRS\EnterpriseSecurityBundle\TwoFactor\TotpSecretGenerator: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\TwoFactor\QrCodeGenerator: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\TwoFactor\RecoveryCodeGenerator: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\TwoFactor\TwoFactorEnforcementChecker:
+        arguments:
+            $policyFactory: '@ThreeBRS\EnterpriseSecurityBundle\Settings\PolicyFactory'
+
+    # OAuth (social login)
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\GoogleOAuthProvider:
+        arguments:
+            $settings: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+            $customerClientId: '%three_brs.oauth.customer.google.client_id%'
+            $customerClientSecret: '%three_brs.oauth.customer.google.client_secret%'
+            $adminClientId: '%three_brs.oauth.admin.google.client_id%'
+            $adminClientSecret: '%three_brs.oauth.admin.google.client_secret%'
+        tags:
+            - { name: 'three_brs.oauth_provider' }
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\AppleOAuthProvider:
+        arguments:
+            $settings: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+            $customerClientId: '%three_brs.oauth.customer.apple.client_id%'
+            $customerTeamId: '%three_brs.oauth.customer.apple.team_id%'
+            $customerKeyId: '%three_brs.oauth.customer.apple.key_id%'
+            $customerPrivateKeyPath: '%three_brs.oauth.customer.apple.private_key_path%'
+            $adminClientId: '%three_brs.oauth.admin.apple.client_id%'
+            $adminTeamId: '%three_brs.oauth.admin.apple.team_id%'
+            $adminKeyId: '%three_brs.oauth.admin.apple.key_id%'
+            $adminPrivateKeyPath: '%three_brs.oauth.admin.apple.private_key_path%'
+        tags:
+            - { name: 'three_brs.oauth_provider' }
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\MicrosoftOAuthProvider:
+        arguments:
+            $settings: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+            $customerClientId: '%three_brs.oauth.customer.microsoft.client_id%'
+            $customerClientSecret: '%three_brs.oauth.customer.microsoft.client_secret%'
+            $customerTenant: '%three_brs.oauth.customer.microsoft.tenant%'
+            $adminClientId: '%three_brs.oauth.admin.microsoft.client_id%'
+            $adminClientSecret: '%three_brs.oauth.admin.microsoft.client_secret%'
+            $adminTenant: '%three_brs.oauth.admin.microsoft.tenant%'
+        tags:
+            - { name: 'three_brs.oauth_provider' }
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderRegistry:
+        arguments:
+            $providers: !tagged_iterator 'three_brs.oauth_provider'
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\AutoRegistrationPolicy: ~
+
+    # Passkey (WebAuthn / FIDO2)
+
+    ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyRelyingPartyEntityFactory:
+        arguments:
+            $rpId: '%three_brs.passkey.rp_id%'
+            $rpName: '%three_brs.passkey.rp_name%'
+
+    ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyCeremonyStepManagerFactory:
+        arguments:
+            $rpId: '%three_brs.passkey.rp_id%'
+
+    ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyValidatorFactory:
+        arguments:
+            $ceremonyStepManagerFactory: '@ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyCeremonyStepManagerFactory'
+
+    ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyWebauthnSerializer: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\Passkey\SessionPasskeyOptionsStorage:
+        arguments:
+            $requestStack: '@request_stack'
+
+    # Magic link
+
+    ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkTokenGenerator: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkTokenValidator:
+        arguments:
+            $clock: '@clock'
+
+    # Timing padding
+
+    ThreeBRS\EnterpriseSecurityBundle\Timing\DeadlineTimingPadding: ~
+
+    # Lockout policies (factory-built per scope)
+
+    three_brs.lockout.policy.customer:
+        class: ThreeBRS\EnterpriseSecurityBundle\Lockout\LockoutPolicy
+        factory: ['@ThreeBRS\EnterpriseSecurityBundle\Settings\PolicyFactory', 'lockoutPolicy']
+        arguments:
+            $scope: !php/enum ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsScope::CUSTOMER
+
+    three_brs.lockout.policy.admin:
+        class: ThreeBRS\EnterpriseSecurityBundle\Lockout\LockoutPolicy
+        factory: ['@ThreeBRS\EnterpriseSecurityBundle\Settings\PolicyFactory', 'lockoutPolicy']
+        arguments:
+            $scope: !php/enum ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsScope::ADMIN
+
+    # Rate limiting
+
+    three_brs.rate_limiter.storage:
+        class: Symfony\Component\RateLimiter\Storage\CacheStorage
+        arguments:
+            - '@three_brs.rate_limiter.cache_pool'
+
+    ThreeBRS\EnterpriseSecurityBundle\RateLimit\DynamicRateLimiterFactory:
+        arguments:
+            $settings: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+            $storage: '@three_brs.rate_limiter.storage'
+
+    ThreeBRS\EnterpriseSecurityBundle\RateLimit\DynamicRateLimiterFactoryInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\RateLimit\DynamicRateLimiterFactory
+
+    ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuard:
+        arguments:
+            $factory: '@ThreeBRS\EnterpriseSecurityBundle\RateLimit\DynamicRateLimiterFactory'
+
+    ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuardInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuard
+
+    # Session utilities
+
+    ThreeBRS\EnterpriseSecurityBundle\Session\UserAgentParser: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\Session\UserAgentParserInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Session\UserAgentParser
+
+    ThreeBRS\EnterpriseSecurityBundle\Session\GeoIp\NullGeoIpLookup: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\Session\GeoIp\GeoIpLookupInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Session\GeoIp\NullGeoIpLookup
+
+    ThreeBRS\EnterpriseSecurityBundle\Session\SessionFingerprintGenerator: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\Session\SessionFingerprintGeneratorInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Session\SessionFingerprintGenerator
+
+    # Settings infrastructure (concrete provider/writer implementations live in the plugin)
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\SettingsDefaultsBuilder: ~
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\SettingsDefaultsBuilderInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\SettingsDefaultsBuilder
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\YamlConfigDefaultsProvider:
+        arguments:
+            $defaults: '%three_brs.security_settings.defaults%'
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\SettingsDefaultsProviderInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\YamlConfigDefaultsProvider
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\PolicyFactory:
+        arguments:
+            $provider: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\PolicyFactoryInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Settings\PolicyFactory
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\FeatureToggle:
+        arguments:
+            $provider: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
+
+    ThreeBRS\EnterpriseSecurityBundle\Settings\FeatureToggleInterface:
+        alias: ThreeBRS\EnterpriseSecurityBundle\Settings\FeatureToggle
+
+    # Account deletion
+
+    ThreeBRS\EnterpriseSecurityBundle\AccountDeletion\GracePeriodCalculator: ~
+
+    # IP whitelist
+
+    ThreeBRS\EnterpriseSecurityBundle\IpWhitelist\CidrMatcher: ~
+
+    # CIDR validator
+
+    ThreeBRS\EnterpriseSecurityBundle\Validator\CidrListValidator:
+        tags:
+            - { name: 'validator.constraint_validator', alias: 'three_brs.validator.cidr_list' }

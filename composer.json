@@ -1,0 +1,67 @@
+{
+    "name": "3brs/enterprise-security-bundle",
+    "type": "symfony-bundle",
+    "description": "Standalone Symfony bundle with reusable security logic — interfaces, services, validators, event listeners",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "endroid/qr-code": "^6.0",
+        "league/oauth2-client": "^2.7",
+        "league/oauth2-google": "^4.0",
+        "matomo/device-detector": "^6.5",
+        "patrickbussmann/oauth2-apple": "^0.4",
+        "psr/clock": "^1.0",
+        "psr/event-dispatcher": "^1.0",
+        "psr/log": "^3.0",
+        "scheb/2fa-bundle": "^7.13",
+        "scheb/2fa-totp": "^7.13",
+        "scheb/2fa-trusted-device": "^7.13",
+        "spomky-labs/otphp": "^11.4",
+        "symfony/config": "^6.4|^7.4",
+        "symfony/polyfill-mbstring": "^1.31",
+        "symfony/dependency-injection": "^6.4|^7.4",
+        "symfony/form": "^6.4|^7.4",
+        "symfony/framework-bundle": "^6.4|^7.4",
+        "symfony/http-foundation": "^6.4|^7.4",
+        "symfony/http-kernel": "^6.4|^7.4",
+        "symfony/password-hasher": "^6.4|^7.4",
+        "symfony/rate-limiter": "^6.4|^7.4",
+        "symfony/routing": "^6.4|^7.4",
+        "symfony/security-bundle": "^6.4|^7.4",
+        "symfony/security-core": "^6.4|^7.4",
+        "symfony/security-csrf": "^6.4|^7.4",
+        "symfony/security-http": "^6.4|^7.4",
+        "symfony/serializer": "^6.4|^7.4",
+        "symfony/translation-contracts": "^3.0",
+        "symfony/validator": "^6.4|^7.4",
+        "thenetworg/oauth2-azure": "^2.2",
+        "twig/twig": "^3.0",
+        "web-auth/webauthn-lib": "^5.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1.10",
+        "phpstan/phpstan-strict-rules": "^2.0.4",
+        "phpstan/phpstan-symfony": "^2.0.3",
+        "phpunit/phpunit": "^11.1 || ^12.0.10",
+        "symplify/easy-coding-standard": "^12.0",
+        "geoip2/geoip2": "^3.0"
+    },
+    "suggest": {
+        "geoip2/geoip2": "Required when wiring ThreeBRS\\EnterpriseSecurityBundle\\Session\\GeoIp\\MaxMindGeoIpLookup as the geoip provider (^3.0)"
+    },
+    "autoload": {
+        "psr-4": {
+            "ThreeBRS\\EnterpriseSecurityBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\ThreeBRS\\EnterpriseSecurityBundle\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        }
+    }
+}
