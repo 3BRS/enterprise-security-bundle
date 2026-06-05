@@ -1,0 +1,26 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-symfony/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # $this->createStub() / $this->createMock() are PHPUnit's static helpers commonly
+        # invoked via instance method in test code — strict-rules flags the dynamic call
+        # but it's an accepted convention.
+        -
+            identifier: staticMethod.dynamicCall
+            path: tests/*
+        # createStub returns Stub&T at runtime, but strict static analysis sees only T —
+        # ->method() chain triggers method.notFound on the bare interface.
+        -
+            identifier: method.notFound
+            path: tests/*
+        # Tests intentionally pass wrong types to verify rejection paths.
+        -
+            identifier: argument.type
+            path: tests/*
