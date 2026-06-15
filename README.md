@@ -19,7 +19,7 @@
 
 A standalone Symfony bundle providing reusable security primitives — two-factor authentication, passkeys (WebAuthn/FIDO2), magic-link login, OAuth (Google, Apple, Microsoft), account lockout with rate limiting, session tracking, IP whitelist/blacklist, password policy / history / expiration, per-user password-login control, GDPR self-service account deletion, and a runtime-configurable settings store.
 
-The bundle is framework-agnostic (any Symfony 6.4 / 7.4 app) and is the engine powering the Sylius-flavored [ThreeBRS Enterprise Security Plugin](https://github.com/3BRS/sylius-enterprise-security-plugin). It ships **contracts and abstract flows, not a wired-up UI** — you bind it to your app's entities, routes and templates. See the [integration guide](#integration-guide) below for how to wire it into a **non-Sylius** Symfony project.
+The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It ships **contracts and abstract flows, not a wired-up UI** — you bind it to your app's entities, routes and templates. See the [integration guide](#integration-guide) below for how to wire it into a Symfony project.
 
 ---
 
@@ -54,28 +54,28 @@ The bundle is framework-agnostic (any Symfony 6.4 / 7.4 app) and is the engine p
 
 ---
 
-## Mapping to the Sylius plugin features
+## Features
 
-The [Sylius plugin](https://github.com/3BRS/sylius-enterprise-security-plugin) is a complete, production integration of this bundle. Each of its 16 features is built on the bundle primitives below — follow the link for the feature-level narrative, screenshots, config options and defaults.
+The bundle covers 16 security features. Each row maps the feature to the bundle primitives that power it — follow the link for the feature-level narrative, config options and defaults.
 
-| Feature | Bundle primitives | Plugin doc |
+| Feature | Bundle primitives | Doc |
 |---|---|---|
-| Password Policy | `PasswordPolicy` constraint + `PasswordPolicyFilteringValidator` | [password-policy](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/password-policy.md) |
-| Password History | `PasswordHistory` constraint + `PasswordSimilarityChecker` | [password-history](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/password-history.md) |
-| Password Expiration | `PasswordExpirationChecker` + user mixins | [password-expiration](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/password-expiration.md) |
-| Password Change Notifications | *(plugin mailer/event, on bundle password primitives)* | [password-change-notifications](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/password-change-notifications.md) |
-| Two-Factor Authentication | TOTP / QR / recovery generators + enforcement checker + flow controllers | [two-factor-authentication](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/two-factor-authentication.md) |
-| 3rd-party OAuth (Social Login) | provider registry + Google/Apple/Microsoft + auto-registration policy | [oauth-social-login](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/oauth-social-login.md) |
-| Magic Link Login | token generator/validator + timing padding + flow controllers | [magic-link-login](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/magic-link-login.md) |
-| Passkey Login (WebAuthn/FIDO2) | WebAuthn serializer + validator factories + flow controllers | [passkey-login](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/passkey-login.md) |
-| Account Lockout & Rate Limiting | `LockoutPolicy` + `RateLimitGuard` + `DynamicRateLimiterFactory` | [account-lockout-rate-limiting](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/account-lockout-rate-limiting.md) |
-| Session Management & Login Notifications | session tracker + fingerprint + UA parser + GeoIP | [session-management-login-notifications](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/session-management-login-notifications.md) |
-| Centralized Security Settings UI | settings provider/writer contracts + feature toggle + policy factory | [centralized-security-settings-ui](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/centralized-security-settings-ui.md) |
-| Self-Service Account Deletion (GDPR) | grace-period calculator + due-deletions processor + anonymizer contract | [account-deletion-gdpr](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/account-deletion-gdpr.md) |
-| Admin IP Whitelist | `CidrMatcher` + `CidrList` constraint + IP restriction listener | [admin-ip-whitelist](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/admin-ip-whitelist.md) |
-| Admin IP Blacklist | same IP restriction primitives (global deny list) | [admin-ip-blacklist](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/admin-ip-blacklist.md) |
-| Admin Customer Management | *(plugin admin UI, on bundle session/lockout/password primitives)* | [admin-customer-management](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/admin-customer-management.md) |
-| Per-User Password Login Control | `AbstractPasswordLoginCheckListener` + preference contracts | [per-user-password-login-control](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/docs/per-user-password-login-control.md) |
+| Password Policy | `PasswordPolicy` constraint + `PasswordPolicyFilteringValidator` | [password-policy](docs/features/password-policy.md) |
+| Password History | `PasswordHistory` constraint + `PasswordSimilarityChecker` | [password-history](docs/features/password-history.md) |
+| Password Expiration | `PasswordExpirationChecker` + user mixins | [password-expiration](docs/features/password-expiration.md) |
+| Password Change Notifications | `password_change_notification.enabled` settings toggle (notification is app-level) | [password-change-notifications](docs/features/password-change-notifications.md) |
+| Two-Factor Authentication | TOTP / QR / recovery generators + enforcement checker + flow controllers | [two-factor-authentication](docs/features/two-factor-authentication.md) |
+| 3rd-party OAuth (Social Login) | provider registry + Google/Apple/Microsoft + auto-registration policy | [oauth-social-login](docs/features/oauth-social-login.md) |
+| Magic Link Login | token generator/validator + timing padding + flow controllers | [magic-link-login](docs/features/magic-link-login.md) |
+| Passkey Login (WebAuthn/FIDO2) | WebAuthn serializer + validator factories + flow controllers | [passkey-login](docs/features/passkey-login.md) |
+| Account Lockout & Rate Limiting | `LockoutPolicy` + `RateLimitGuard` + `DynamicRateLimiterFactory` | [account-lockout-rate-limiting](docs/features/account-lockout-rate-limiting.md) |
+| Session Management & Login Notifications | session tracker + fingerprint + UA parser + GeoIP | [session-management-login-notifications](docs/features/session-management-login-notifications.md) |
+| Centralized Security Settings UI | settings provider/writer contracts + feature toggle + policy factory | [centralized-security-settings-ui](docs/features/centralized-security-settings-ui.md) |
+| Self-Service Account Deletion (GDPR) | grace-period calculator + due-deletions processor + anonymizer contract | [account-deletion-gdpr](docs/features/account-deletion-gdpr.md) |
+| Admin IP Whitelist | `CidrMatcher` + `CidrList` constraint + IP restriction listener | [admin-ip-whitelist](docs/features/admin-ip-whitelist.md) |
+| Admin IP Blacklist | same IP restriction primitives (global deny list) | [admin-ip-blacklist](docs/features/admin-ip-blacklist.md) |
+| Admin Customer Management | session / lockout / password primitives | [admin-customer-management](docs/features/admin-customer-management.md) |
+| Per-User Password Login Control | `AbstractPasswordLoginCheckListener` + preference contracts | [per-user-password-login-control](docs/features/per-user-password-login-control.md) |
 
 ---
 
@@ -137,21 +137,18 @@ vendor/bin/phpstan analyse      # level max, generics + symfony extensions
 vendor/bin/ecs check            # coding standard (--fix to apply)
 ```
 
-`make bundle-tests` / `make ci` exist only in the parent [monorepo](https://github.com/3BRS/sylius-enterprise-security-plugin) (they wrap these commands plus the plugin's Behat suite via Docker) — they are not part of this standalone repository.
-
 ---
 
-## Reference implementation
+## Using this bundle on Sylius
 
-The [Sylius Enterprise Security Plugin](https://github.com/3BRS/sylius-enterprise-security-plugin) is a complete, production-grade integration of this bundle for [Sylius](https://sylius.com). Browse [its `src/`](https://github.com/3BRS/sylius-enterprise-security-plugin/tree/main/src) for end-to-end examples of:
-- All bundle controllers extended with Sylius bindings
-- Bundle service interfaces implemented over Doctrine
-- Sylius admin UI (form types, templates, menu entries) on top of the bundle's primitives
-
-If you build a Symfony-only or Laminas integration on top of this bundle, please open a PR to link it from this README.
+Building a [Sylius](https://sylius.com) store? You don't need to wire any of this by hand — the [ThreeBRS Enterprise Security Plugin](https://github.com/3BRS/sylius-enterprise-security-plugin) implements the ready-made Sylius UI on top of this bundle.
 
 ---
 
 ## License
 
-[MIT](LICENSE)
+MIT License. See [LICENSE](./LICENSE) for details.
+
+## Credits
+
+Developed by [3BRS](https://3brs.com)

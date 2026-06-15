@@ -66,7 +66,7 @@ The available user-mixin contracts (add per feature you enable):
 
 > **About the `Shop` / `Admin` naming:** the two flavors are identical contracts — historic naming from Sylius (which has two firewalls: shop = customers, admin = staff). If your app has **one** firewall, pick either flavor and stick with it. If you have **two** firewalls and want them feature-flagged independently, use both. Bundle abstract controllers work with any firewall via `getFirewallName()`.
 
-The bundle ships ready-made traits in the Sylius plugin (see [plugin `src/Model/`](https://github.com/3BRS/sylius-enterprise-security-plugin/tree/main/src/Model)) you can copy as a starting point if your schema is similar.
+The mixin methods are thin (plain getters/setters over a few columns) — implement them directly on your entity, or fold them into a trait you reuse across firewalls.
 
 ## Persisted entities you must provide
 

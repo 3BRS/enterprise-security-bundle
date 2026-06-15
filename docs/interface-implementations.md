@@ -75,7 +75,7 @@ class DbSettingsProvider implements SettingsProviderInterface
                 $this->cache[$row->getScope() . '.' . $row->getPath()] = $row->getValue();
             }
         }
-        return $this->cache[$key] ?? $this->defaults->getDefaultFor($path, $scope);
+        return $this->cache[$key] ?? $this->defaults->get($path, $scope);
     }
 }
 ```
@@ -127,15 +127,20 @@ Bundle's `MagicLinkTokenGenerator` + `MagicLinkTokenValidator` are concrete — 
 
 ## Reference impl: Passkey assertion verifier
 
-Heavier example because WebAuthn ceremony involves multiple bundle services. See [the Sylius plugin's `CustomerPasskeyAssertionVerifier`](https://github.com/3BRS/sylius-enterprise-security-plugin/blob/main/src/Service/Passkey/CustomerPasskeyAssertionVerifier.php) for a complete ~80-line example. The skeleton:
+Heavier example because the WebAuthn ceremony involves multiple bundle services. A complete skeleton:
 
 ```php
+use Webauthn\AuthenticatorAssertionResponse;
+use Webauthn\PublicKeyCredential;
+use Webauthn\PublicKeyCredentialRequestOptions;
+use Webauthn\PublicKeyCredentialSource;
+
 class PasskeyAssertionVerifier implements PasskeyAssertionVerifierInterface
 {
     public function __construct(
-        protected PasskeyValidatorFactoryInterface $validatorFactory,   // bundle
-        protected PasskeyWebauthnSerializerInterface $serializer,        // bundle
         protected SessionPasskeyOptionsStorageInterface $sessionStorage, // bundle
+        protected PasskeyWebauthnSerializerInterface $serializer,        // bundle
+        protected PasskeyValidatorFactoryInterface $validatorFactory,    // bundle
         protected UserPasskeyCredentialRepository $repo,                 // your repo
         protected EntityManagerInterface $em,                            // your EM
         protected ClockInterface $clock,
@@ -143,29 +148,39 @@ class PasskeyAssertionVerifier implements PasskeyAssertionVerifierInterface
 
     public function verify(string $credentialResponseJson, string $host): PasskeyAssertionResultInterface
     {
-        // 1. Read pending options from session (set during /passkey/login/options)
-        $optionsJson = $this->sessionStorage->retrieve('shop.assertion_options')
-            ?? throw new \RuntimeException('No pending passkey ceremony.');
+        // 1. Read + consume the pending ceremony options the options endpoint stored
+        //    (same session key the options builder wrote them under).
+        $serializedOptions = $this->sessionStorage->consume(self::ASSERTION_OPTIONS_KEY)
+            ?? throw new \RuntimeException('No passkey assertion ceremony in progress.');
 
-        // 2. Deserialize options + the user's response
-        $options = $this->serializer->deserializeRequestOptions($optionsJson);
-        $response = $this->serializer->deserializeCredential($credentialResponseJson);
+        // 2. Deserialize the stored options and the browser's credential response.
+        $options    = $this->serializer->deserialize($serializedOptions, PublicKeyCredentialRequestOptions::class);
+        $credential = $this->serializer->deserialize($credentialResponseJson, PublicKeyCredential::class);
 
-        // 3. Look up the credential by ID; verify via bundle's WebAuthn validator
-        $credential = $this->repo->findOneByCredentialId($response->id)
+        $response = $credential->response;
+        if (!$response instanceof AuthenticatorAssertionResponse) {
+            throw new \RuntimeException('Expected an assertion response from the client.');
+        }
+
+        // 3. Look up the stored credential by its raw id; rebuild its source object.
+        $stored = $this->repo->findOneByCredentialId($credential->rawId)
             ?? throw new \RuntimeException('Unknown credential.');
+        $source = $this->serializer->denormalize($stored->getCredentialSource(), PublicKeyCredentialSource::class);
 
-        $validator = $this->validatorFactory->build($host);
-        $validatedCredential = $validator->check($response, $options, $credential->toSource(), $host);
+        // 4. Run the WebAuthn assertion check (signature, RP id, sign-count, …); returns the updated source.
+        $updatedSource = $this->validatorFactory->createAssertionValidator()->check(
+            $source, $response, $options, $host, $source->userHandle,
+        );
 
-        // 4. Update signCount + lastUsedAt, return result
-        $credential->setSignCount($validatedCredential->counter);
-        $credential->setLastUsedAt($this->clock->now());
+        // 5. Persist the bumped sign-count + lastUsedAt — flush here, atomic with the check,
+        //    to close the replay window between concurrent assertions.
+        $stored->setCredentialSource($this->serializer->normalize($updatedSource));
+        $stored->setLastUsedAt($this->clock->now());
         $this->em->flush();
 
-        return new PasskeyAssertionResult($credential->getUser(), $validatedCredential->isUserVerified);
+        return new PasskeyAssertionResult($stored->getUser(), $response->authenticatorData->isUserVerified());
     }
 }
 ```
 
-`PasskeyAssertionResult` is a small DTO you write (or copy from the plugin) implementing `PasskeyAssertionResultInterface`.
+`PasskeyAssertionResult` is a small DTO you write implementing `PasskeyAssertionResultInterface` (`getUser()` + `isUserVerified()`). `ASSERTION_OPTIONS_KEY` is the session key your options endpoint stored the ceremony under via `SessionPasskeyOptionsStorageInterface::store()`. `$stored->getUser()` is your credential entity's owner accessor — the bundle's `PasskeyCredentialRecordInterface` covers credential data only (id, source, label, timestamps), not the user association, so expose the owner on your own entity.
