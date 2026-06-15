@@ -30,10 +30,10 @@ class PasskeyAssertionVerifier implements PasskeyAssertionVerifierInterface
 
     public function verify(string $credentialResponseJson, string $host): PasskeyAssertionResultInterface
     {
-        // 1. read pending options from session
-        // 2. deserialize response, look up credential by ID via $this->repo
-        // 3. validate via $this->validatorFactory->build(...)
-        // 4. update signCount, return result
+        // 1. consume pending options from session ($this->sessionStorage->consume(...))
+        // 2. deserialize options + response ($this->serializer->deserialize(...)), look up credential by raw id via $this->repo
+        // 3. validate via $this->validatorFactory->createAssertionValidator()->check(...)
+        // 4. persist bumped sign-count + lastUsedAt, return result
     }
 }
 ```
@@ -134,7 +134,7 @@ Repeat for every flow you want enabled (typically ~15–25 controllers across al
 
 ## Multi-firewall apps
 
-If your app has **separate firewalls** (e.g. `shop` for customers, `admin` for staff), write **two** subclasses per feature — one per firewall — each returning its own `getFirewallName()`, route names, and templates. Register two service instances. The Sylius plugin does this throughout [`src/Controller/Shop/`](https://github.com/3BRS/sylius-enterprise-security-plugin/tree/main/src/Controller/Shop) and [`src/Controller/Admin/`](https://github.com/3BRS/sylius-enterprise-security-plugin/tree/main/src/Controller/Admin).
+If your app has **separate firewalls** (e.g. `shop` for customers, `admin` for staff), write **two** subclasses per feature — one per firewall — each returning its own `getFirewallName()`, route names, and templates, and register two service instances.
 
 ## Registering a concrete list controller
 
@@ -184,36 +184,79 @@ For multi-firewall apps register the same class twice with different repos + tem
 
 ---
 
-## Reference: abstract controllers shipped
+## Reference: abstract controllers and their bind surface
 
-Each lives in `ThreeBRS\EnterpriseSecurityBundle\Controller\`. Number after the name = count of abstract methods you implement.
+Each lives in `ThreeBRS\EnterpriseSecurityBundle\Controller\`. The **abstract methods** listed under each controller are exactly what your subclass implements — there is nothing else to fill in. They fall into recognisable categories:
 
-**Authentication flows:**
-- `AbstractPasskeyLoginVerifyController` (4) — verify WebAuthn assertion, authenticate, redirect (2FA-aware)
-- `AbstractPasskeyRegistrationOptionsController` (2) — return WebAuthn creation options JSON
-- `AbstractPasskeyRegistrationVerifyController` (3) — verify + persist credential
-- `AbstractPasskeyDeleteController` (6) — CSRF + look-up + last-method guard + delete
-- `AbstractPasskeyListController` (3) — fetch + render
-- `AbstractMagicLinkRequestController` (4) — form + dispatch
-- `AbstractMagicLinkVerifyController` (8) — verify token + authenticate (2FA-aware)
-- `AbstractOAuthInitiateController` (5) — state CSRF + provider redirect
-- `AbstractOAuthCallbackController` (20) — fetch user info + login or link branching
-- `AbstractOAuthConfirmLinkController` (12) — password verify + link existing user
-- `AbstractTwoFactorSetupController` (13) — TOTP + QR + recovery-code wizard. After verification, writes plaintext recovery codes to session under the key returned by `getPlainRecoveryCodesSessionKey()` and redirects to `getRecoveryCodesDisplayUrl()` — that URL **must** point to a one-shot display controller you provide (see [Controllers your app must provide §5](controllers-you-provide.md#5-recovery-codes-one-shot-display-page-critical)).
-- `AbstractTwoFactorRecoveryChallengeController` (5) — recovery-code login completion
-- `AbstractTwoFactorDisableController` (5) — disable + invalidate codes + rotate trusted-token
-- `AbstractTwoFactorRegenerateRecoveryCodesController` (7) — generate + replace. Same session-handoff pattern as setup (writes to `getPlainRecoveryCodesSessionKey()`, redirects to `getRecoveryCodesDisplayUrl()`); the redirect target is the same one-shot display controller you wrote for setup.
+- **Identity narrowing** (`isAcceptableUser`, `isTwoFactorCapableUser`, `isAcceptableCurrentUser`, …) — return `false` for users who must not hit this endpoint. Returning `true` blindly is an access-control bypass.
+- **Persistence** (`find*ForUser`, `commit*`, `delete*`, `registerAndLink`, `linkExistingUser`, …) — your Doctrine lookups and writes, over the [record interfaces](entities-and-persistence.md) and [verifier impls](interface-implementations.md).
+- **Routes / URLs** (`get*Url`, `get*Route`) — where to send the user; you pick the paths (see [Routes reference](routes.md)).
+- **Firewall / log / audit** (`getFirewallName`, `getLogChannel`, `getAuditChannel`, `getAuditUserIdKey`) — per-firewall identifiers; keep them unique across firewalls.
+- **Templates / forms** (`getTemplate`, `getSetupTemplate`, `create*Form`) — your Twig path / a CSRF-enabled form type.
+- **Session keys** (`get*SessionKey`) — per-firewall session namespacing; keep unique across firewalls.
 
-**Self-service / admin actions:**
-- `AbstractSessionRevokeController` (4)
-- `AbstractSessionRevokeOthersController` (3)
-- `AbstractSessionsListController` (3)
-- `AbstractSocialAccountUnlinkController` (7) — CSRF + last-method guard + delete + audit
-- `AbstractUnlockUserController` (3) — admin: CSRF + lockoutManager.unlock
-- `AbstractAccountDeletionCancelController` (2) — admin: cancel pending deletion
-- `AbstractAccountDeletionRequestController` (7) — customer: password verify + grace period
+Every abstract controller shares the **constructor pattern** from the [worked example above](#example-passkey-login-verify-the-webauthn-assertion-endpoint): shared framework services passed to `parent::__construct`, the feature's verifier/manager service, and a `bool $enabled` that makes the flow return 404 when the feature is off. The exact dependency list is the controller's own `__construct` signature — open it, or follow the example's service definition shape.
 
-**Concrete (no extension needed — register one or more instances per firewall with the appropriate DI arguments):**
+### Authentication — passkey
+
+- `AbstractPasskeyLoginVerifyController` — verify WebAuthn assertion, authenticate, redirect (2FA-aware).
+  `getFirewallName`, `getDefaultRedirectUrl`, `getLogChannel`, `handlePostLogin($user, $request)`
+- `AbstractPasskeyRegistrationOptionsController` — return WebAuthn creation-options JSON.
+  `isAcceptableUser`, `buildRegistrationOptions($user): PublicKeyCredentialCreationOptions`
+- `AbstractPasskeyRegistrationVerifyController` — verify + persist a credential.
+  `isAcceptableUser`, `verifyAndPersist($user, $credentialJson, $label, $host)`, `getLogChannel`
+- `AbstractPasskeyListController` — fetch + render the user's passkeys.
+  `isAcceptableUser`, `findCredentialsForUser($user): iterable`, `getTemplate`
+- `AbstractPasskeyDeleteController` — CSRF + lookup + last-method guard + delete.
+  `getCsrfTokenId`, `isAcceptableUser`, `findCredentialForUser($id, $user): ?object`, `canRemoveCredential($user): bool`, `deleteCredential($credential)`, `getPasskeyListUrl`
+
+### Authentication — magic link
+
+- `AbstractMagicLinkRequestController` — render form + dispatch the email.
+  `createForm`, `dispatchFromForm($form)`, `getRedirectRoute`, `getTemplate`
+- `AbstractMagicLinkVerifyController` — verify the token + authenticate (2FA-aware).
+  `isFullyAuthenticatedUser(?$token)`, `getUserFromMagicLink($record): UserInterface`, `commitMagicLinkUsage($record)`, `getFirewallName`, `getDefaultRedirectUrl`, `getMagicLinkRequestUrl`, `getLogChannel`, `handlePostLogin($user, $request)`
+
+### Authentication — OAuth
+
+- `AbstractOAuthInitiateController` — state-CSRF + redirect to provider.
+  `isProviderEnabledForScope($provider)`, `getOAuthGroup`, `getStateSessionKey`, `getIntentSessionKey`, `getCallbackRouteName`
+- `AbstractOAuthCallbackController` — fetch user info, then branch login / link / auto-register.
+  `getOAuthGroup`, `getCallbackRouteName`, `getFirewallName`, `getStateSessionKey`, `getIntentSessionKey`, `getConfirmPendingSessionKey`, `getLoginRoute`, `getDashboardUrl`, `getSocialAccountsRoute`, `getConfirmLinkRoute`, `getAuditChannel`, `getAuditUserIdKey`, `isAcceptableCurrentUser(?$user)`, `findExistingLinkUser($info): ?UserInterface`, `findUserByEmail($email): ?UserInterface`, `canAutoRegister($info): bool`, `registerAndLink($info): UserInterface`, `linkExistingUser($user, $info)`, `touchLastUsed($user, $info)`, `handlePostLogin($user, $request)`
+- `AbstractOAuthConfirmLinkController` — password-verify + link the existing user.
+  `getConfirmPendingSessionKey`, `getFirewallName`, `getLoginRoute`, `getDashboardUrl`, `getTemplate`, `getAuditChannel`, `getAuditUserIdKey`, `findUserByEmail($email): ?UserInterface`, `findExistingLink($provider, $providerUserId): ?SocialAccountLinkRecordInterface`, `isLinkOwnedByUser($existing, $user): bool`, `linkExistingUser($user, $info)`, `handlePostLogin($user, $request)`
+
+### Authentication — two-factor
+
+- `AbstractTwoFactorSetupController` — TOTP + QR + recovery-code setup wizard.
+  `isAcceptableUser`, `isTwoFactorAlreadyEnabled($user)`, `getUsernameForProvisioning($user)`, `createVerifyForm`, `enableTwoFactorAndPersistRecoveryCodes($user, $secret, $plainCodes)`, `getLoginUrl`, `getSetupTemplate`, `getManageTemplate`, `getRecoveryCodesDisplayUrl`, `getPendingSecretSessionKey`, `getPlainRecoveryCodesSessionKey`, `getDisableCsrfTokenId`, `getRegenerateCsrfTokenId`.
+  After verification it writes the plaintext recovery codes to session under `getPlainRecoveryCodesSessionKey()` and redirects to `getRecoveryCodesDisplayUrl()` — that URL **must** point to a one-shot display controller you provide (see [Controllers your app must provide §5](controllers-you-provide.md#5-recovery-codes-one-shot-display-page-critical)).
+- `AbstractTwoFactorRecoveryChallengeController` — recovery-code login completion.
+  `isAcceptableUser`, `verifyAndConsumeRecoveryCode($user, $code): bool`, `getFirewallName`, `getDefaultRedirectUrl`, `getTemplate`
+- `AbstractTwoFactorDisableController` — disable + invalidate codes + rotate trusted-token.
+  `getCsrfTokenId`, `isTwoFactorCapableUser($user)`, `disableTwoFactorAndCommit($user)`, `getLoginUrl`, `getRedirectAfterDisableUrl`
+- `AbstractTwoFactorRegenerateRecoveryCodesController` — generate + replace recovery codes.
+  `getCsrfTokenId`, `isTwoFactorEnabledUser($user)`, `replaceRecoveryCodesAndCommit($user, $plainCodes)`, `getPlainRecoveryCodesSessionKey`, `getLoginUrl`, `getDashboardUrl`, `getRecoveryCodesDisplayUrl`.
+  Same session handoff as setup — the redirect target is the same one-shot display controller.
+
+### Self-service / admin actions
+
+- `AbstractSessionsListController` — list the user's active sessions.
+  `isAcceptableUser`, `findActiveSessionsForUser($user): iterable`, `getTemplate`
+- `AbstractSessionRevokeController` — CSRF-protected single-session revoke.
+  `isAcceptableUser`, `findSessionForUser($id, $user): ?SessionRecordInterface`, `revokeSession($session)`, `getSessionsListUrl($request)`
+- `AbstractSessionRevokeOthersController` — CSRF-protected revoke-all-others.
+  `isAcceptableUser`, `revokeOtherSessions($currentSessionId, $user)`, `getSessionsListUrl($request)`
+- `AbstractSocialAccountUnlinkController` — CSRF + last-method guard + delete + audit.
+  `getCsrfTokenId($provider)`, `isAcceptableUser`, `canUnlinkProvider($user, $provider): bool`, `deleteLinkForProvider($user, $provider): bool`, `getSocialAccountsUrl`, `getAuditChannel`, `getAuditUserIdKey`
+- `AbstractUnlockUserController` — admin: CSRF + unlock a locked user.
+  `getCsrfTokenId`, `getLockedListUrl`, `attemptUnlock($id): ?bool`
+- `AbstractAccountDeletionRequestController` — customer: password-verify + open a grace-period request.
+  `isAcceptableUser`, `hasDeletableSubject($user)`, `createDeletionRequestForm`, `dispatchDeletionRequest($user)`, `getRequestFormUrl`, `getPostDeletionUrl`, `getTemplate`
+- `AbstractAccountDeletionCancelController` — admin: cancel a pending deletion.
+  `cancelDeletionRequest($id): bool`, `getDeletionsListUrl`
+
+### Concrete (no extension needed — register one or more instances per firewall with the appropriate DI arguments)
 - `PasskeyLoginOptionsController` — pure JSON API; inject `PasskeyAssertionOptionsBuilderInterface` impl + `PasskeyWebauthnSerializerInterface` + `bool $enabled` (throws 404 when disabled)
 - `LockedUsersListController` — render-only list; inject `LockedUserRepositoryInterface` impl + `Twig\Environment` + `string $template` + `bool $enabled` (throws 404 when disabled)
 - `AccountDeletionsListController` — render-only list of pending deletion requests; inject `CustomerDeletionRequestRepositoryInterface` impl + `Twig\Environment` + `string $template` + `bool $enabled` (throws 404 when disabled)

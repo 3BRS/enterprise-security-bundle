@@ -54,7 +54,7 @@ services:
         alias: App\Security\Settings\DbSettingsProvider
 ```
 
-(The Sylius plugin ships `SettingsProvider` / `SettingsWriter` impls — refer to them for a complete example. A full Doctrine-backed reference impl is in [Interface implementations](interface-implementations.md).)
+(A full Doctrine-backed reference impl is in [Interface implementations](interface-implementations.md).)
 
 ## 3. Feature flags (compile-time defaults)
 
@@ -67,7 +67,7 @@ services:
             $defaults: '%three_brs.security_settings.defaults%'
 ```
 
-Set the `three_brs.security_settings.defaults` parameter in your kernel extension or `services.yaml` based on your initial configuration. (The Sylius plugin builds this from its Configuration tree.)
+Set the `three_brs.security_settings.defaults` parameter (a `scope => path => value` map) in your kernel extension or `services.yaml`. You can write it directly, or assemble it from a structured config array with the bundle's `SettingsDefaultsBuilder`, which flattens a per-feature/per-scope tree into the flat map `YamlConfigDefaultsProvider` expects.
 
 ## 4. Required scalar parameters
 
