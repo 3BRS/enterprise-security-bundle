@@ -178,9 +178,9 @@ class PasskeyAssertionVerifier implements PasskeyAssertionVerifierInterface
         $stored->setLastUsedAt($this->clock->now());
         $this->em->flush();
 
-        return new PasskeyAssertionResult($stored->getUser(), $response->authenticatorData->isUserVerified());
+        return new PasskeyAssertionResult($stored->getUser());
     }
 }
 ```
 
-`PasskeyAssertionResult` is a small DTO you write implementing `PasskeyAssertionResultInterface` (`getUser()` + `isUserVerified()`). `ASSERTION_OPTIONS_KEY` is the session key your options endpoint stored the ceremony under via `SessionPasskeyOptionsStorageInterface::store()`. `$stored->getUser()` is your credential entity's owner accessor — the bundle's `PasskeyCredentialRecordInterface` covers credential data only (id, source, label, timestamps), not the user association, so expose the owner on your own entity.
+`PasskeyAssertionResult` is a small DTO you write implementing `PasskeyAssertionResultInterface` (`getUser()`). `ASSERTION_OPTIONS_KEY` is the session key your options endpoint stored the ceremony under via `SessionPasskeyOptionsStorageInterface::store()`. `$stored->getUser()` is your credential entity's owner accessor — the bundle's `PasskeyCredentialRecordInterface` covers credential data only (id, source, label, timestamps), not the user association, so expose the owner on your own entity.

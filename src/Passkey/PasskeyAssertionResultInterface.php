@@ -9,6 +9,4 @@ use Symfony\Component\Security\Core\User\UserInterface;
 interface PasskeyAssertionResultInterface
 {
     public function getUser(): UserInterface;
-
-    public function isUserVerified(): bool;
 }
