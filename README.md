@@ -145,6 +145,12 @@ Building a [Sylius](https://sylius.com) store? You don't need to wire any of thi
 
 ---
 
+## Changelog & upgrading
+
+See [CHANGELOG.md](CHANGELOG.md) for the release history and [UPGRADE.md](UPGRADE.md) for version-to-version migration steps.
+
+---
+
 ## License
 
 MIT License. See [LICENSE](./LICENSE) for details.
@@ -152,4 +158,3 @@ MIT License. See [LICENSE](./LICENSE) for details.
 ## Credits
 
 Developed by [3BRS](https://3brs.com)
-a 
