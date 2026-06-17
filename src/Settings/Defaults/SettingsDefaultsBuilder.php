@@ -69,7 +69,6 @@ class SettingsDefaultsBuilder implements SettingsDefaultsBuilderInterface
         );
         $result[SettingsScope::GLOBAL->value]['passkey.rp_id'] = $processedConfig['passkey']['rp_id'];
         $result[SettingsScope::GLOBAL->value]['passkey.rp_name'] = $processedConfig['passkey']['rp_name'];
-        $result[SettingsScope::GLOBAL->value]['passkey.skip_2fa_when_user_verified'] = $processedConfig['passkey']['skip_2fa_when_user_verified'];
         $result[SettingsScope::GLOBAL->value]['session_management.geoip_service'] = $processedConfig['session_management']['geoip_service'];
         $result[SettingsScope::ADMIN->value]['ip_whitelist.enabled'] = (bool) $processedConfig['ip_whitelist']['enabled'];
         $result[SettingsScope::ADMIN->value]['ip_whitelist.global_cidrs'] = [];

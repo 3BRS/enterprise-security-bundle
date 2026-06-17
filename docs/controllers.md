@@ -48,9 +48,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Security\Passkey\PasskeyAssertionVerifier;
 use App\Security\Session\PostLoginSessionTracker;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
-use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
@@ -62,17 +60,13 @@ class PasskeyLoginVerifyController extends AbstractPasskeyLoginVerifyController
     public function __construct(
         PasskeyAssertionVerifier $verifier,
         TokenStorageInterface $tokenStorage,
-        EventDispatcherInterface $eventDispatcher,
-        AuthenticationRequiredHandlerInterface $twoFactorHandler,
         RouterInterface $router,
         LoggerInterface $logger,
         protected PostLoginSessionTracker $sessionTracker,
         bool $enabled,
-        bool $skipTwoFactorWhenUserVerified,
     ) {
         parent::__construct(
-            $verifier, $tokenStorage, $eventDispatcher, $twoFactorHandler,
-            $router, $logger, $enabled, $skipTwoFactorWhenUserVerified,
+            $verifier, $tokenStorage, $router, $logger, $enabled,
         );
     }
 
@@ -109,13 +103,10 @@ services:
         arguments:
             $verifier: '@App\Security\Passkey\PasskeyAssertionVerifier'
             $tokenStorage: '@security.token_storage'
-            $eventDispatcher: '@security.event_dispatcher.main'
-            $twoFactorHandler: '@security.authentication.authentication_required_handler.two_factor.main'
             $router: '@router'
             $logger: '@logger'
             $sessionTracker: '@App\Security\Session\PostLoginSessionTracker'
             $enabled: true
-            $skipTwoFactorWhenUserVerified: true
         tags:
             - { name: 'controller.service_arguments' }
 ```
@@ -199,7 +190,7 @@ Every abstract controller shares the **constructor pattern** from the [worked ex
 
 ### Authentication — passkey
 
-- `AbstractPasskeyLoginVerifyController` — verify WebAuthn assertion, authenticate, redirect (2FA-aware).
+- `AbstractPasskeyLoginVerifyController` — verify WebAuthn assertion, authenticate, redirect (bypasses 2FA).
   `getFirewallName`, `getDefaultRedirectUrl`, `getLogChannel`, `handlePostLogin($user, $request)`
 - `AbstractPasskeyRegistrationOptionsController` — return WebAuthn creation-options JSON.
   `isAcceptableUser`, `buildRegistrationOptions($user): PublicKeyCredentialCreationOptions`
@@ -214,7 +205,7 @@ Every abstract controller shares the **constructor pattern** from the [worked ex
 
 - `AbstractMagicLinkRequestController` — render form + dispatch the email.
   `createForm`, `dispatchFromForm($form)`, `getRedirectRoute`, `getTemplate`
-- `AbstractMagicLinkVerifyController` — verify the token + authenticate (2FA-aware).
+- `AbstractMagicLinkVerifyController` — verify the token + authenticate (bypasses 2FA).
   `isFullyAuthenticatedUser(?$token)`, `getUserFromMagicLink($record): UserInterface`, `commitMagicLinkUsage($record)`, `getFirewallName`, `getDefaultRedirectUrl`, `getMagicLinkRequestUrl`, `getLogChannel`, `handlePostLogin($user, $request)`
 
 ### Authentication — OAuth

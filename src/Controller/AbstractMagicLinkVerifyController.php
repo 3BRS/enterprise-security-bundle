@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace ThreeBRS\EnterpriseSecurityBundle\Controller;
 
 use Psr\Clock\ClockInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
-use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
-use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,10 +14,7 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
-use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
-use Symfony\Component\Security\Http\Event\AuthenticationTokenCreatedEvent;
 use ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkRecordInterface;
 use ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkTokenVerifierInterface;
 
@@ -32,8 +26,6 @@ abstract class AbstractMagicLinkVerifyController
     public function __construct(
         protected MagicLinkTokenVerifierInterface $verifier,
         protected TokenStorageInterface $tokenStorage,
-        protected EventDispatcherInterface $eventDispatcher,
-        protected AuthenticationRequiredHandlerInterface $twoFactorHandler,
         protected RouterInterface $router,
         protected ClockInterface $clock,
         protected LoggerInterface $logger,
@@ -47,9 +39,9 @@ abstract class AbstractMagicLinkVerifyController
             throw new NotFoundHttpException();
         }
 
-        // Post-2FA redirect-back idempotency: scheb/2fa's prepare_on_login saves the
-        // current URL as the post-2FA target_path, so once 2FA succeeds the user lands
-        // back here. At that point the magic link has already done its job.
+        // Idempotency: if the visitor is already fully authenticated (e.g. they
+        // clicked the emailed link twice, or while already logged in), don't
+        // re-consume the magic link — just send them on.
         if ($this->isFullyAuthenticatedUser($this->tokenStorage->getToken())) {
             return new RedirectResponse(
                 $this->resolveRedirectUrl($request, $this->getFirewallName(), $this->getDefaultRedirectUrl()),
@@ -76,11 +68,7 @@ abstract class AbstractMagicLinkVerifyController
             'ip' => $request->getClientIp(),
         ]);
 
-        $authenticatedToken = $this->authenticate($request, $user);
-
-        if ($authenticatedToken instanceof TwoFactorTokenInterface) {
-            return $this->twoFactorHandler->onAuthenticationRequired($request, $authenticatedToken);
-        }
+        $this->authenticate($request, $user);
 
         return new RedirectResponse(
             $this->resolveRedirectUrl($request, $this->getFirewallName(), $this->getDefaultRedirectUrl()),
@@ -107,35 +95,28 @@ abstract class AbstractMagicLinkVerifyController
 
     abstract protected function handlePostLogin(UserInterface $user, Request $request): void;
 
-    protected function authenticate(Request $request, UserInterface $user): TokenInterface
+    protected function authenticate(Request $request, UserInterface $user): void
     {
-        $userIdentifier = $user->getUserIdentifier();
-        $passport = new SelfValidatingPassport(new UserBadge($userIdentifier, static fn () => $user));
-        $token = new PostAuthenticationToken($user, $this->getFirewallName(), $user->getRoles());
-
-        $event = new AuthenticationTokenCreatedEvent($token, $passport);
-        $this->eventDispatcher->dispatch($event);
-
-        $resultToken = $event->getAuthenticatedToken();
-
         // Session-fixation defence: rotate the session ID before binding the
-        // newly authenticated token. The magic-link flow goes through a custom
-        // passport-less login path that would otherwise inherit the pre-login ID.
+        // newly authenticated token to it, so the pre-authentication session ID
+        // cannot be reused to ride the resulting authenticated session.
         if ($request->hasSession()) {
             $request->getSession()->migrate(true);
         }
 
-        $this->tokenStorage->setToken($resultToken);
+        $token = new PostAuthenticationToken($user, $this->getFirewallName(), $user->getRoles());
+        $this->tokenStorage->setToken($token);
 
         if ($request->hasSession()) {
-            $request->getSession()->set('_security_' . $this->getFirewallName(), serialize($resultToken));
+            $request->getSession()->set('_security_' . $this->getFirewallName(), serialize($token));
         }
 
-        // Manual setToken bypasses the firewall event dispatcher, so the
-        // LoginSuccessEvent listener that tracks sessions / sends new-device
-        // notifications never fires. Subclass hooks into post-login here.
+        // Magic-link login writes the token directly (like OAuth and passkey),
+        // intentionally bypassing the firewall authenticator — and with it scheb's
+        // two-factor challenge. The second factor only guards plain password login.
+        // Writing the token directly also means Symfony's LoginSuccessEvent never
+        // fires, so session tracking / new-device notifications run through the
+        // post-login hook below.
         $this->handlePostLogin($user, $request);
-
-        return $resultToken;
     }
 }

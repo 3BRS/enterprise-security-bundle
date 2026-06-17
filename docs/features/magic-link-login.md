@@ -16,7 +16,7 @@ Passwordless sign-in: the user submits their email and receives a single-use lin
 **Hardening built into the flow:**
 - **Anti-enumeration response.** The request endpoint always returns the same neutral confirmation whether the email is known, unknown, disabled or rate-limited — no account-existence leak.
 - **Timing-attack mitigation.** Pad every code path to a fixed wall-clock deadline with `DeadlineTimingPadding` (default `targetSeconds = 2.0`, comfortably covering the slowest happy path — DB write + SMTP send) so response time doesn't leak existence either. Tune by decorating the `ThreeBRS\EnterpriseSecurityBundle\Timing\DeadlineTimingPadding` service with a different `$targetSeconds`.
-- **2FA-aware.** When the user has 2FA enabled, `AbstractMagicLinkVerifyController` dispatches `AuthenticationTokenCreatedEvent` on the firewall dispatcher so scheb can wrap the token; if the result is a `TwoFactorTokenInterface` it redirects to the 2FA challenge — the magic link does **not** bypass the second factor.
+- **Bypasses 2FA.** `AbstractMagicLinkVerifyController` writes the authenticated token directly (like OAuth and passkey), so scheb's two-factor challenge is **not** triggered after a magic-link sign-in — the second factor only guards plain password login.
 
 ## Settings
 

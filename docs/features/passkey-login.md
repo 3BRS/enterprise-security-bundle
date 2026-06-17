@@ -17,8 +17,7 @@ Passwordless sign-in with passkeys — platform authenticators (Touch ID, Window
 - Flow controllers: `PasskeyLoginOptionsController` (concrete JSON endpoint) + the abstract `AbstractPasskeyLoginVerifyController`, `AbstractPasskeyRegistrationOptionsController`, `AbstractPasskeyRegistrationVerifyController`, `AbstractPasskeyListController`, `AbstractPasskeyDeleteController` — abstract methods and the full extend/register/route walkthrough are in [Controllers](../controllers.md) (the passkey login-verify flow is the worked example there).
 
 **Behaviour:**
-- **2FA-aware (safe by default).** `AbstractPasskeyLoginVerifyController` dispatches `AuthenticationTokenCreatedEvent` so scheb can wrap the token and redirect to the 2FA challenge — passkeys do **not** bypass the second factor by default.
-- **Optional UV bypass.** With `three_brs.passkey.skip_2fa_when_user_verified` true, a passkey whose `userVerified` flag is set (authenticator required biometrics/PIN) is accepted as multi-factor on its own and skips the 2FA challenge. The flag is passed into your verify-controller subclass (see [Configuration §4](../configuration.md#4-required-scalar-parameters)).
+- **Bypasses 2FA.** `AbstractPasskeyLoginVerifyController` writes the authenticated token directly (like OAuth and magic link), so scheb's two-factor challenge is **not** triggered after a passkey sign-in. A passkey already proves possession of the registered authenticator; the second factor only guards plain password login.
 - **Last-method guard.** `AbstractPasskeyDeleteController` refuses to remove a user's last remaining sign-in method.
 
 ## Front-end
@@ -52,7 +51,6 @@ parameters:
 parameters:
     three_brs.passkey.rp_id: 'example.com'                 # your domain (or `localhost` in dev)
     three_brs.passkey.rp_name: 'Example App'               # display name shown by the browser
-    three_brs.passkey.skip_2fa_when_user_verified: false
 ```
 
 Expose the login endpoints as public — the verify controller authenticates internally:

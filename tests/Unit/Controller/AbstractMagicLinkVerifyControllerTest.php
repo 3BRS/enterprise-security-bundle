@@ -7,9 +7,7 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
-use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
@@ -19,7 +17,6 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Http\Event\AuthenticationTokenCreatedEvent;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractMagicLinkVerifyController;
 use ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkRecordInterface;
@@ -48,7 +45,7 @@ class AbstractMagicLinkVerifyControllerTest extends TestCase
         self::assertSame('/magic-link/request', $response->getTargetUrl());
     }
 
-    public function testRedirectsToDashboardOnSuccess(): void
+    public function testRedirectsToDashboardOnSuccessWithoutTwoFactorChallenge(): void
     {
         $magicLink = $this->createStub(MagicLinkRecordInterface::class);
 
@@ -58,6 +55,9 @@ class AbstractMagicLinkVerifyControllerTest extends TestCase
         $controller = $this->makeController(verifier: $verifier);
         $response = $controller($this->requestWithSession(), 'good-token');
 
+        // Magic-link login authenticates directly and lands on the dashboard — it
+        // never routes through scheb's two-factor challenge (2FA guards plain
+        // password login only).
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertSame('/dashboard', $response->getTargetUrl());
     }
@@ -76,23 +76,16 @@ class AbstractMagicLinkVerifyControllerTest extends TestCase
     ): AbstractMagicLinkVerifyController {
         $verifier ??= $this->createStub(MagicLinkTokenVerifierInterface::class);
 
-        $eventDispatcher = $this->createStub(EventDispatcherInterface::class);
-        $eventDispatcher->method('dispatch')->willReturnCallback(static fn (AuthenticationTokenCreatedEvent $e) => $e);
-
         $clock = $this->createStub(ClockInterface::class);
         $clock->method('now')->willReturn(new \DateTimeImmutable());
 
         $router = $this->createStub(RouterInterface::class);
-        $router->method('generate')->willReturnMap([
-            ['/dashboard', [], 1, '/dashboard'],
-            ['/magic-link/request', [], 1, '/magic-link/request'],
-        ]);
         $router->method('generate')->willReturn('/dashboard');
 
         $tokenStorage = $this->createStub(TokenStorageInterface::class);
         $tokenStorage->method('getToken')->willReturn(null);
 
-        return new class($verifier, $tokenStorage, $eventDispatcher, $this->createStub(AuthenticationRequiredHandlerInterface::class), $router, $clock, new NullLogger(), $enabled) extends AbstractMagicLinkVerifyController {
+        return new class($verifier, $tokenStorage, $router, $clock, new NullLogger(), $enabled) extends AbstractMagicLinkVerifyController {
             protected function isFullyAuthenticatedUser(?TokenInterface $token): bool
             {
                 return false;
