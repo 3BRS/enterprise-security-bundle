@@ -145,7 +145,6 @@ class SettingsDefaultsBuilderTest extends TestCase
                 'admin' => $perScopeFeature(),
                 'rp_id' => null,
                 'rp_name' => null,
-                'skip_2fa_when_user_verified' => false,
             ],
             'account_lockout' => [
                 'customer' => $perScopeFeature([

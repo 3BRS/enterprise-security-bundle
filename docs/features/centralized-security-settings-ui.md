@@ -24,7 +24,7 @@ Not everything belongs in the runtime store:
 |---|---|
 | `password_policy.*`, `password_history.*`, `password_expiration.*` | passkey `three_brs.passkey.rp_id` / `rp_name` (bound to registered credentials — changing them invalidates existing passkeys) |
 | `password_change_notification.enabled`, `login_notifications.enabled` | OAuth client credentials (`three_brs.oauth.*` — secrets; storing them in a DB would leak them via UI, dumps, audit logs) |
-| `two_factor_authentication.mode` / `recovery_codes.*` | `three_brs.passkey.skip_2fa_when_user_verified` |
+| `two_factor_authentication.mode` / `recovery_codes.*` | |
 | `magic_link.*`, `passkey.enabled` | GeoIP provider (a DI alias resolved at compile time — see [Session management](session-management-login-notifications.md#enabling-geoip-location-lookups)) |
 | `account_lockout.*`, `rate_limit.*`, `session_management.enabled` | |
 | `oauth.{provider}.enabled`, `oauth.auto_register_allowed_email_domains` | |

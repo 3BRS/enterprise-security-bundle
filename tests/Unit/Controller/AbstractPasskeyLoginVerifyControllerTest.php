@@ -6,9 +6,7 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
-use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,7 +14,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Http\Event\AuthenticationTokenCreatedEvent;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractPasskeyLoginVerifyController;
 use ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyAssertionResultInterface;
 use ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyAssertionVerifierInterface;
@@ -56,13 +53,12 @@ class AbstractPasskeyLoginVerifyControllerTest extends TestCase
         self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
     }
 
-    public function testReturnsOkOnSuccess(): void
+    public function testReturnsOkOnSuccessWithoutTwoFactorChallenge(): void
     {
         $user = $this->createStub(UserInterface::class);
 
         $result = $this->createStub(PasskeyAssertionResultInterface::class);
         $result->method('getUser')->willReturn($user);
-        $result->method('isUserVerified')->willReturn(true);
 
         $verifier = $this->createStub(PasskeyAssertionVerifierInterface::class);
         $verifier->method('verify')->willReturn($result);
@@ -74,6 +70,9 @@ class AbstractPasskeyLoginVerifyControllerTest extends TestCase
 
         $response = $controller($request);
 
+        // Passkey login authenticates directly and returns the dashboard redirect —
+        // it never routes through scheb's two-factor challenge (2FA guards plain
+        // password login only).
         self::assertInstanceOf(JsonResponse::class, $response);
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
     }
@@ -84,13 +83,10 @@ class AbstractPasskeyLoginVerifyControllerTest extends TestCase
     ): AbstractPasskeyLoginVerifyController {
         $verifier ??= $this->createStub(PasskeyAssertionVerifierInterface::class);
 
-        $eventDispatcher = $this->createStub(EventDispatcherInterface::class);
-        $eventDispatcher->method('dispatch')->willReturnCallback(static fn (AuthenticationTokenCreatedEvent $e) => $e);
-
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturn('/dashboard');
 
-        return new class($verifier, $this->createStub(TokenStorageInterface::class), $eventDispatcher, $this->createStub(AuthenticationRequiredHandlerInterface::class), $router, new NullLogger(), $enabled, false) extends AbstractPasskeyLoginVerifyController {
+        return new class($verifier, $this->createStub(TokenStorageInterface::class), $router, new NullLogger(), $enabled) extends AbstractPasskeyLoginVerifyController {
             protected function getFirewallName(): string
             {
                 return 'shop';

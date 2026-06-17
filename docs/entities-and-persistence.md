@@ -66,7 +66,7 @@ The available user-mixin contracts (add per feature you enable):
 
 > **About the `Shop` / `Admin` naming:** the two flavors are identical contracts — historic naming from Sylius (which has two firewalls: shop = customers, admin = staff). If your app has **one** firewall, pick either flavor and stick with it. If you have **two** firewalls and want them feature-flagged independently, use both. Bundle abstract controllers work with any firewall via `getFirewallName()`.
 
-The mixin methods are thin (plain getters/setters over a few columns) — implement them directly on your entity, or fold them into a trait you reuse across firewalls.
+The mixin methods are thin (plain getters/setters over a few columns) — implement them directly on your entity, or fold them into a trait you reuse across firewalls. One exception: `PasswordExpiration*` also requires `getCreatedAt(): ?\DateTimeInterface` — the account creation timestamp, used as the expiration fallback when a user has no recorded password change yet. Most user entities already expose this (e.g. via a timestampable trait), so there is usually nothing extra to add.
 
 ## Persisted entities you must provide
 

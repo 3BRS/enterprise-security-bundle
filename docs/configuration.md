@@ -88,7 +88,6 @@ parameters:
     # … plus Apple if used; admin variants if you have a separate admin firewall
 ```
 
-Two more parameters are not read by the bundle directly but typically belong in the same block because your wiring depends on them:
+One more parameter is not read by the bundle directly but typically belongs in the same block because your wiring depends on it:
 
-- `three_brs.passkey.skip_2fa_when_user_verified` — passed through the **subclass** constructor of `AbstractPasskeyLoginVerifyController` (see [Controllers](controllers.md)). You define the parameter and reference it as `'%three_brs.passkey.skip_2fa_when_user_verified%'` in the controller's service definition.
 - `three_brs.two_factor.issuer` — used to configure **`scheb/2fa-bundle`** (the bundle's 2FA dependency), e.g. via `prepend()` in your extension when wiring `scheb_two_factor.totp.issuer`. The bundle controllers themselves do not read it.

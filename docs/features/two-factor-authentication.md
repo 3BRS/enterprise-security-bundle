@@ -9,6 +9,7 @@ TOTP-based 2FA (Google Authenticator, Authy, 1Password, …), built on top of [`
 - **Recovery codes** — a set of single-use backup codes issued at setup for when the authenticator is lost; the user can regenerate them later, which invalidates the previous set.
 - **Trusted device** — an optional "remember this device" cookie that skips the 2FA prompt on a known device; revocable per user by bumping `trustedTokenVersion` (which invalidates their trusted-device cookies).
 - **Per-scope enforcement** — a three-state mode (`disabled` / `allowed` / `enforced`). In `enforced` mode a user who hasn't enrolled is held at the setup step until they do; `allowed` lets users opt in; `disabled` hides the feature.
+- **Guards password login only.** The second factor is challenged on plain email + password sign-in; passwordless methods (OAuth, passkey, magic link) authenticate directly and bypass 2FA by design.
 
 **Bundle primitives:**
 - `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator` (each with an `*Interface`) — the setup building blocks.
