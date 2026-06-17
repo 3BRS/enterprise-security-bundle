@@ -29,13 +29,6 @@ class PasswordExpirationCheckerTest extends TestCase
         self::assertTrue($checker->isShopUserPasswordExpired($this->shopUser(forcePasswordChange: true)));
     }
 
-    public function testShopUserExpiredWhenPasswordChangedAtIsNull(): void
-    {
-        $checker = $this->createChecker();
-
-        self::assertTrue($checker->isShopUserPasswordExpired($this->shopUser(passwordChangedAt: null)));
-    }
-
     public function testShopUserExpiredWhenPasswordOlderThanConfiguredDays(): void
     {
         $checker = $this->createChecker(customerDays: 30);
@@ -54,6 +47,48 @@ class PasswordExpirationCheckerTest extends TestCase
         ));
     }
 
+    public function testShopUserExpiredWhenNeverChangedAndAccountOlderThanWindow(): void
+    {
+        $checker = $this->createChecker(customerDays: 30);
+
+        // No recorded password change (account created before this feature was in
+        // place): fall back to the creation date, which is older than the window → expired.
+        self::assertTrue($checker->isShopUserPasswordExpired(
+            $this->shopUser(passwordChangedAt: null, createdAt: new \DateTime('-31 days')),
+        ));
+    }
+
+    public function testShopUserNotExpiredWhenNeverChangedButAccountWithinWindow(): void
+    {
+        $checker = $this->createChecker(customerDays: 30);
+
+        // No recorded password change, but the account is younger than the window
+        // → not expired (this is the integration fix: no forced reset for everyone).
+        self::assertFalse($checker->isShopUserPasswordExpired(
+            $this->shopUser(passwordChangedAt: null, createdAt: new \DateTime('-10 days')),
+        ));
+    }
+
+    public function testShopUserNotExpiredWhenNeitherDateIsKnown(): void
+    {
+        $checker = $this->createChecker(customerDays: 30);
+
+        self::assertFalse($checker->isShopUserPasswordExpired(
+            $this->shopUser(passwordChangedAt: null, createdAt: null),
+        ));
+    }
+
+    public function testShopUserPrefersPasswordChangedAtOverCreationDate(): void
+    {
+        $checker = $this->createChecker(customerDays: 30);
+
+        // A recent password change on a long-existing account must NOT be expired:
+        // passwordChangedAt wins over the (much older) creation date.
+        self::assertFalse($checker->isShopUserPasswordExpired(
+            $this->shopUser(passwordChangedAt: new \DateTimeImmutable('-10 days'), createdAt: new \DateTime('-999 days')),
+        ));
+    }
+
     public function testAdminUserNotExpiredWhenDisabled(): void
     {
         $checker = $this->createChecker(adminEnabled: false);
@@ -66,13 +101,6 @@ class PasswordExpirationCheckerTest extends TestCase
         $checker = $this->createChecker();
 
         self::assertTrue($checker->isAdminUserPasswordExpired($this->adminUser(forcePasswordChange: true)));
-    }
-
-    public function testAdminUserExpiredWhenPasswordChangedAtIsNull(): void
-    {
-        $checker = $this->createChecker();
-
-        self::assertTrue($checker->isAdminUserPasswordExpired($this->adminUser(passwordChangedAt: null)));
     }
 
     public function testAdminUserExpiredWhenPasswordOlderThanConfiguredDays(): void
@@ -90,6 +118,42 @@ class PasswordExpirationCheckerTest extends TestCase
 
         self::assertFalse($checker->isAdminUserPasswordExpired(
             $this->adminUser(passwordChangedAt: new \DateTimeImmutable('-30 days')),
+        ));
+    }
+
+    public function testAdminUserExpiredWhenNeverChangedAndAccountOlderThanWindow(): void
+    {
+        $checker = $this->createChecker(adminDays: 60);
+
+        self::assertTrue($checker->isAdminUserPasswordExpired(
+            $this->adminUser(passwordChangedAt: null, createdAt: new \DateTime('-61 days')),
+        ));
+    }
+
+    public function testAdminUserNotExpiredWhenNeverChangedButAccountWithinWindow(): void
+    {
+        $checker = $this->createChecker(adminDays: 60);
+
+        self::assertFalse($checker->isAdminUserPasswordExpired(
+            $this->adminUser(passwordChangedAt: null, createdAt: new \DateTime('-30 days')),
+        ));
+    }
+
+    public function testAdminUserNotExpiredWhenNeitherDateIsKnown(): void
+    {
+        $checker = $this->createChecker(adminDays: 60);
+
+        self::assertFalse($checker->isAdminUserPasswordExpired(
+            $this->adminUser(passwordChangedAt: null, createdAt: null),
+        ));
+    }
+
+    public function testAdminUserPrefersPasswordChangedAtOverCreationDate(): void
+    {
+        $checker = $this->createChecker(adminDays: 60);
+
+        self::assertFalse($checker->isAdminUserPasswordExpired(
+            $this->adminUser(passwordChangedAt: new \DateTimeImmutable('-30 days'), createdAt: new \DateTime('-999 days')),
         ));
     }
 
@@ -135,10 +199,12 @@ class PasswordExpirationCheckerTest extends TestCase
     private function shopUser(
         bool $forcePasswordChange = false,
         ?\DateTimeImmutable $passwordChangedAt = null,
+        ?\DateTimeInterface $createdAt = null,
     ): PasswordExpirationShopUserInterface {
         $user = $this->createStub(PasswordExpirationShopUserInterface::class);
         $user->method('isForcePasswordChange')->willReturn($forcePasswordChange);
         $user->method('getPasswordChangedAt')->willReturn($passwordChangedAt);
+        $user->method('getCreatedAt')->willReturn($createdAt);
 
         return $user;
     }
@@ -146,10 +212,12 @@ class PasswordExpirationCheckerTest extends TestCase
     private function adminUser(
         bool $forcePasswordChange = false,
         ?\DateTimeImmutable $passwordChangedAt = null,
+        ?\DateTimeInterface $createdAt = null,
     ): PasswordExpirationAdminUserInterface {
         $user = $this->createStub(PasswordExpirationAdminUserInterface::class);
         $user->method('isForcePasswordChange')->willReturn($forcePasswordChange);
         $user->method('getPasswordChangedAt')->willReturn($passwordChangedAt);
+        $user->method('getCreatedAt')->willReturn($createdAt);
 
         return $user;
     }

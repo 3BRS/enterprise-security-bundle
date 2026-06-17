@@ -50,7 +50,7 @@ The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It 
 - **Hardening:** `DeadlineTimingPadding` — constant-time response padding against account enumeration
 - **Twig extensions:** `MagicLinkExtension`, `PasskeyExtension`, `SocialProvidersExtension`
 
-**Contracts you implement** (the bundle ships interfaces; you provide Doctrine-backed impls): persisted-record contracts (`MagicLinkRecordInterface`, `SessionRecordInterface`, `SocialAccountLinkRecordInterface`, `CustomerDeletionRequestRecordInterface`, `PasskeyCredentialRecordInterface`), repository contracts, the `UserAnonymizerInterface`, and per-feature user mixins (`TwoFactorAuth*`, `Lockable*`, `PasswordExpiration*`). See [Entities & persistence](docs/entities-and-persistence.md) and [Interface implementations](docs/interface-implementations.md).
+**Contracts you implement** (the bundle ships interfaces; you provide Doctrine-backed impls): persisted-record contracts (`MagicLinkRecordInterface`, `SessionRecordInterface`, `SocialAccountLinkRecordInterface`, `CustomerDeletionRequestRecordInterface`, `PasskeyCredentialRecordInterface`), repository contracts, the `UserAnonymizerInterface`, and per-feature user mixins (`TwoFactorAuth*`, `Lockable*`, `PasswordExpiration*`). The `PasswordExpiration*` mixins additionally require `getCreatedAt(): ?\DateTimeInterface` (the account creation timestamp) — used as the expiration fallback for users who have never changed their password, so wire it up on your user entity if it does not already expose one. See [Entities & persistence](docs/entities-and-persistence.md) and [Interface implementations](docs/interface-implementations.md).
 
 ---
 
