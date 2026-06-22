@@ -129,6 +129,10 @@ services:
         arguments:
             $clock: '@clock'
 
+    # OAuth account-link confirmation code
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthLinkCodeGenerator: ~
+
     # Timing padding
 
     ThreeBRS\EnterpriseSecurityBundle\Timing\DeadlineTimingPadding: ~

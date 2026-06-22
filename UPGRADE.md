@@ -19,3 +19,11 @@
 
 5. **`PasskeyAssertionResultInterface::isUserVerified()` is gone** — only
    `getUser()` is required now.
+
+6. **OAuth confirm-link is now challenge-based, not password-based.**
+   `AbstractOAuthConfirmLinkController` dropped `$passwordHasher` from its constructor and
+   added two abstract methods to implement: `prepareChallenge(UserInterface $user, array
+   $pending, Request $request): void` (issue the ownership proof, e.g. email a code) and
+   `verifyChallenge(UserInterface $user, array $pending, Request $request): ?string`
+   (return `null` on success, otherwise a translation key). Update your subclasses and
+   their service definitions accordingly.

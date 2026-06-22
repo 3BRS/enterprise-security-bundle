@@ -9,6 +9,8 @@ _Targets 1.1.0. Integrators must apply the steps in [UPGRADE.md](UPGRADE.md)._
 
 ### Added
 - `getCreatedAt(): ?\DateTimeInterface` on `PasswordExpiration{Shop,Admin}UserInterface`.
+- `OAuthLinkCodeGenerator` / `OAuthLinkCodeGeneratorInterface` — generates and SHA-256-hashes
+  a zero-padded 6-digit numeric confirmation code.
 
 ### Changed
 - `PasswordExpirationChecker` no longer treats a missing `passwordChangedAt` as
@@ -18,6 +20,9 @@ _Targets 1.1.0. Integrators must apply the steps in [UPGRADE.md](UPGRADE.md)._
   OAuth). 2FA guards plain password login only.
 - Constructors of `AbstractMagicLinkVerifyController` and
   `AbstractPasskeyLoginVerifyController` lost their 2FA arguments.
+- `AbstractOAuthConfirmLinkController` no longer verifies a password inline. Proof of
+  account ownership is now pluggable via the abstract `prepareChallenge()` (issue the
+  proof) and `verifyChallenge()` (validate it) hooks; its constructor lost `$passwordHasher`.
 
 ### Removed
 - Parameter `three_brs.passkey.skip_2fa_when_user_verified` (and its setting key).
