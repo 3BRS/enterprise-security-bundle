@@ -16,7 +16,7 @@ URLs are up to you — these are the controllers and the typical HTTP verbs. Pic
 | `AbstractMagicLinkVerifyController` | GET | `/magic-link/verify/{token}` | Email click target |
 | `AbstractOAuthInitiateController` | GET | `/oauth/{provider}` | Redirects to provider |
 | `AbstractOAuthCallbackController` | GET | `/oauth/{provider}/callback` | Provider callback target |
-| `AbstractOAuthConfirmLinkController` | GET, POST | `/oauth/confirm-link` | Existing user password verify |
+| `AbstractOAuthConfirmLinkController` | GET, POST | `/oauth/confirm-link` | Existing-account ownership-proof challenge |
 | `AbstractSocialAccountUnlinkController` | POST | `/account/social/{provider}/unlink` | CSRF-protected unlink |
 | `AbstractTwoFactorSetupController` | GET, POST | `/account/two-factor` | Setup wizard / manage |
 | `AbstractTwoFactorRecoveryChallengeController` | GET, POST | `/2fa/recovery` | Login completion via recovery code |

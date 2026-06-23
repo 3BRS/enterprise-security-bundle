@@ -214,8 +214,8 @@ Every abstract controller shares the **constructor pattern** from the [worked ex
   `isProviderEnabledForScope($provider)`, `getOAuthGroup`, `getStateSessionKey`, `getIntentSessionKey`, `getCallbackRouteName`
 - `AbstractOAuthCallbackController` — fetch user info, then branch login / link / auto-register.
   `getOAuthGroup`, `getCallbackRouteName`, `getFirewallName`, `getStateSessionKey`, `getIntentSessionKey`, `getConfirmPendingSessionKey`, `getLoginRoute`, `getDashboardUrl`, `getSocialAccountsRoute`, `getConfirmLinkRoute`, `getAuditChannel`, `getAuditUserIdKey`, `isAcceptableCurrentUser(?$user)`, `findExistingLinkUser($info): ?UserInterface`, `findUserByEmail($email): ?UserInterface`, `canAutoRegister($info): bool`, `registerAndLink($info): UserInterface`, `linkExistingUser($user, $info)`, `touchLastUsed($user, $info)`, `handlePostLogin($user, $request)`
-- `AbstractOAuthConfirmLinkController` — password-verify + link the existing user.
-  `getConfirmPendingSessionKey`, `getFirewallName`, `getLoginRoute`, `getDashboardUrl`, `getTemplate`, `getAuditChannel`, `getAuditUserIdKey`, `findUserByEmail($email): ?UserInterface`, `findExistingLink($provider, $providerUserId): ?SocialAccountLinkRecordInterface`, `isLinkOwnedByUser($existing, $user): bool`, `linkExistingUser($user, $info)`, `handlePostLogin($user, $request)`
+- `AbstractOAuthConfirmLinkController` — issue + verify an ownership-proof challenge, then link the existing user.
+  `getConfirmPendingSessionKey`, `getFirewallName`, `getLoginRoute`, `getDashboardUrl`, `getTemplate`, `getAuditChannel`, `getAuditUserIdKey`, `findUserByEmail($email): ?UserInterface`, `findExistingLink($provider, $providerUserId): ?SocialAccountLinkRecordInterface`, `isLinkOwnedByUser($existing, $user): bool`, `linkExistingUser($user, $info)`, `handlePostLogin($user, $request)`, `prepareChallenge($user, $pending, $request)` (issue the proof — e.g. email a one-time code), `verifyChallenge($user, $pending, $request): ?string` (`null` on success, otherwise a translation key)
 
 ### Authentication — two-factor
 

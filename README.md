@@ -39,7 +39,7 @@ The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It 
 - **2FA:** `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator`, `TwoFactorEnforcementChecker` (+ `TwoFactorMode` enum), `TwoFactorAwareAuthenticationSuccessHandler`
 - **Magic link:** `MagicLinkTokenGenerator`, `MagicLinkTokenValidator`
 - **Passkey:** `PasskeyValidatorFactory`, `PasskeyCeremonyStepManagerFactory`, `PasskeyRelyingPartyEntityFactory`, `PasskeyWebauthnSerializer`, `SessionPasskeyOptionsStorage`
-- **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`
+- **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`, `OAuthLinkCodeGenerator` (confirm-link one-time-code helper)
 - **Lockout & rate limiting:** `LockoutPolicy`, `RateLimitGuard`, `DynamicRateLimiterFactory`
 - **Sessions:** `UserAgentParser`, `SessionFingerprintGenerator`, `GeoIpLookup` (MaxMind + Null impls)
 - **Passwords:** `PasswordExpirationChecker`, `PasswordSimilarityChecker` (history), `PasswordPolicyFilteringValidator` + `PasswordPolicy` / `PasswordHistory` Symfony constraints

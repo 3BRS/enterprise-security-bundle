@@ -6,7 +6,7 @@ Sign in (and optionally auto-register) with **Google, Apple and Microsoft** — 
 
 **What it does:**
 - **Social sign-in** — drives the OAuth redirect/callback, fetches the user's profile, and signs them in. The exact outcome depends on what's found for the identity's email (see [the three callback outcomes](#the-three-callback-outcomes) below).
-- **Account linking** — connects a social identity to an existing account (after a password confirmation, to prevent takeover); a user can link several providers and **unlink** them from their account page (the unlink guard won't remove their last sign-in method).
+- **Account linking** — connects a social identity to an existing account (after confirming ownership of that account, to prevent takeover); a user can link several providers and **unlink** them from their account page (the unlink guard won't remove their last sign-in method).
 - **Auto-registration** — for an unknown email, optionally creates a new account, gated by `AutoRegistrationPolicy` (any verified email, a domain whitelist, or off).
 - **Pluggable providers** — Google / Apple / Microsoft ship in the bundle; anything implementing `OAuthProviderInterface` and tagged for the registry joins the login buttons automatically.
 
@@ -15,6 +15,7 @@ Sign in (and optionally auto-register) with **Google, Apple and Microsoft** — 
 - `GoogleOAuthProvider`, `AppleOAuthProvider`, `MicrosoftOAuthProvider` (+ interfaces) — ship in the bundle. Apple's ES256 `client_secret` JWT is generated at runtime from team id / key id / `.p8` private key; Microsoft uses the Identity Platform v2.0 endpoint with a configurable `tenant`.
 - `OAuthProviderInterface` — implement it for a new provider: `getName()`, `isEnabledForCustomer()`, `isEnabledForAdmin()`, `getAuthorizationUrl($redirectUri, $state, $group)`, `fetchUserInfo($request, $redirectUri, $expectedState, $group)` (returns an `OAuthUserInfoInterface`: provider name, provider user id, email, first/last name, email-verified flag). `$group` is `customer` or `admin`.
 - `AutoRegistrationPolicy` (`AutoRegistrationPolicyInterface`) — `canAutoRegister($info, ?array $allowedEmailDomains)`. Requires a verified email, then: `null` ⇒ allow any verified email; `[]` ⇒ deny (auto-registration off); a list ⇒ allow only those email domains.
+- `OAuthLinkCodeGenerator` (`OAuthLinkCodeGeneratorInterface`) — optional helper for the confirm-link challenge: generates and SHA-256-hashes a zero-padded 6-digit one-time code, for subclasses that prove account ownership by emailing a code.
 - `SocialAccountLinkRecordInterface` — the persisted link record you implement (see [Entities & persistence](../entities-and-persistence.md)); a user can have several.
 - `SocialProvidersExtension` Twig helper — enumerates enabled providers so a template renders the right "Sign in with …" buttons.
 - Flow controllers (extend + bind): `AbstractOAuthInitiateController`, `AbstractOAuthCallbackController`, `AbstractOAuthConfirmLinkController`, `AbstractSocialAccountUnlinkController`; plus the render-only `SocialAccountsOverviewController`. Their abstract methods (the bind surface — `findUserByEmail`, `registerAndLink`, `linkExistingUser`, …) are listed in [Controllers](../controllers.md#reference-abstract-controllers-and-their-bind-surface).
@@ -24,7 +25,7 @@ Sign in (and optionally auto-register) with **Google, Apple and Microsoft** — 
 `AbstractOAuthCallbackController` branches on what it finds for the OAuth identity's email:
 
 1. **Already linked** → straight log-in.
-2. **Email matches a local account** → a password-confirmation prompt (`AbstractOAuthConfirmLinkController`) before the link is created — prevents account takeover.
+2. **Email matches a local account** → an ownership-proof challenge (`AbstractOAuthConfirmLinkController`) before the link is created — prevents account takeover. The proof is pluggable via the controller's `prepareChallenge()` / `verifyChallenge()` hooks (e.g. a one-time code emailed to the account).
 3. **Unknown email** → `AutoRegistrationPolicy` decides whether to auto-create the account and link the identity.
 
 The unlink action enforces a last-method guard: it refuses to remove the last remaining sign-in method so a user can't lock themselves out.
