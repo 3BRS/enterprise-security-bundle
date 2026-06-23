@@ -12,7 +12,7 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsScope;
 
-class AppleOAuthProvider implements AppleOAuthProviderInterface
+class AppleOAuthProvider implements AppleOAuthProviderInterface, FormPostOAuthProviderInterface
 {
     public const NAME = 'apple';
 
