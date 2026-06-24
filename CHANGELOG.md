@@ -5,9 +5,6 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 
 ## [Unreleased]
 
-_Prepared for the next release; version to be set by the maintainer. These changes remove
-and alter public API, so per [SemVer](https://semver.org/) they require a **major** bump.
-Integrators must apply the [UPGRADE.md](UPGRADE.md) "1.1 → X.Y" steps._
 
 ### Added
 - `OAuthLinkCodeGenerator` (`OAuthLinkCodeGeneratorInterface`) — optional confirm-link helper

@@ -22,8 +22,6 @@
 
 ## 1.1 → X.Y
 
-> Prepared for the next release — the maintainer fills in the version. This batch
-> removes/changes public API (breaking) → major bump per SemVer.
 
 1. **Password-login control is now scope-wide, not per-user.** If you extended
    `AbstractPasswordLoginCheckListener`:
