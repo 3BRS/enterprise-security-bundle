@@ -17,6 +17,8 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderRegistryInterface;
+use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSigner;
+use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 /** @internal test double: a provider whose callback is a cross-site form_post (like Apple) */
 interface FormPostTestProviderInterface extends OAuthProviderInterface, FormPostOAuthProviderInterface
@@ -26,6 +28,8 @@ interface FormPostTestProviderInterface extends OAuthProviderInterface, FormPost
 #[CoversClass(AbstractOAuthInitiateController::class)]
 class AbstractOAuthInitiateControllerTest extends TestCase
 {
+    protected const SECRET = 'test-secret';
+
     public function testThrowsOnUnknownProvider(): void
     {
         $registry = $this->createStub(OAuthProviderRegistryInterface::class);
@@ -89,7 +93,13 @@ class AbstractOAuthInitiateControllerTest extends TestCase
         self::assertSame(Cookie::SAMESITE_NONE, $cookie->getSameSite());
         self::assertTrue($cookie->isSecure());
         self::assertTrue($cookie->isHttpOnly());
-        self::assertStringContainsString('"state"', (string) $cookie->getValue());
+        // The value is HMAC-signed, not plain JSON — it must decode back to the state payload.
+        $value = (string) $cookie->getValue();
+        self::assertStringNotContainsString('"state"', $value);
+        $decoded = (new StateCookieSigner(self::SECRET))->decode($value);
+        self::assertIsArray($decoded);
+        self::assertArrayHasKey('state', $decoded);
+        self::assertSame('login', $decoded['intent']);
     }
 
     protected function requestWithSession(): Request
@@ -107,13 +117,14 @@ class AbstractOAuthInitiateControllerTest extends TestCase
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturn('https://example/callback');
 
-        return new class($registry, $router, $providerEnabled) extends AbstractOAuthInitiateController {
+        return new class($registry, $router, new StateCookieSigner(self::SECRET), $providerEnabled) extends AbstractOAuthInitiateController {
             public function __construct(
                 OAuthProviderRegistryInterface $registry,
                 RouterInterface $router,
+                StateCookieSignerInterface $stateCookieSigner,
                 protected bool $providerEnabled,
             ) {
-                parent::__construct($registry, $router);
+                parent::__construct($registry, $router, $stateCookieSigner);
             }
 
             protected function isProviderEnabledForScope(OAuthProviderInterface $provider): bool

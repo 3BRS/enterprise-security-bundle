@@ -14,6 +14,7 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderRegistryInterface;
+use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 abstract class AbstractOAuthInitiateController
 {
@@ -22,6 +23,7 @@ abstract class AbstractOAuthInitiateController
     public function __construct(
         protected OAuthProviderRegistryInterface $registry,
         protected RouterInterface $router,
+        protected StateCookieSignerInterface $stateCookieSigner,
         protected ?Security $security = null,
     ) {
     }
@@ -91,7 +93,7 @@ abstract class AbstractOAuthInitiateController
 
         return Cookie::create(
             $this->getStateSessionKey() . '_' . $provider,
-            (string) json_encode($payload),
+            $this->stateCookieSigner->encode($payload),
             time() + static::STATE_COOKIE_LIFETIME,
             '/',
             null,

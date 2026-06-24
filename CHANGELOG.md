@@ -9,6 +9,13 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 ### Added
 - `OAuthLinkCodeGenerator` (`OAuthLinkCodeGeneratorInterface`) — optional confirm-link helper
   that mints a zero-padded 6-digit one-time code and SHA-256-hashes it for storage/comparison.
+- Cross-site `form_post` OAuth provider support (e.g. Apple Sign In): the
+  `FormPostOAuthProviderInterface` opt-in marker plus a dedicated `SameSite=None; Secure;
+  HttpOnly` single-use **HMAC-signed** state cookie carrying state / intent / link-initiating
+  user across the cross-site POST (the session cookie is not sent there). GET-redirect
+  providers (Google, Microsoft) are unaffected.
+- `StateCookieSigner` (`StateCookieSignerInterface`) — signs and verifies that state cookie so
+  its payload (including the link-initiating user) cannot be forged or tampered with by the client.
 
 ### Changed
 - Password-login control is now a single **scope-wide** toggle instead of a per-user
@@ -26,6 +33,11 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   (verifies the submitted proof on POST; returns `null` on success or a translation key on
   failure). `__invoke()` keeps its signature but delegates the check to these hooks instead of
   reading the `_password` request field.
+- `AbstractOAuthInitiateController` gained a `StateCookieSignerInterface` constructor argument
+  (and an optional `Security` to capture the logged-in user for a link); `AbstractOAuthCallbackController`
+  gained a `StateCookieSignerInterface` argument and a new abstract hook
+  `findUserByIdentifier(string $identifier): ?UserInterface` that resolves the link-initiating
+  user from the verified state cookie on a cross-site callback.
 
 ### Removed
 - `PasswordLoginPreferenceInterface` and `PasswordLoginPreferenceRepositoryInterface` — the

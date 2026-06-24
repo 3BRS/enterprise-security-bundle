@@ -56,3 +56,17 @@
    - (Optional) `OAuthLinkCodeGenerator` is a ready-made helper for a code-based challenge:
      `generateCode()` mints the 6-digit code, `hash()` (SHA-256) stores/compares it. Reference
      it by its concrete service id — there is no interface alias for autowiring.
+
+3. **OAuth cross-site `form_post` providers (Apple) now use a signed state cookie.** If you
+   extended the OAuth initiate/callback controllers:
+   - Wire the bundle's `StateCookieSigner` service (registered with `$secret: '%kernel.secret%'`,
+     so the cookie's integrity relies on a strong, secret `APP_SECRET` — as the rest of Symfony
+     security already does) into both subclasses' service definitions:
+     `AbstractOAuthInitiateController` gained a `StateCookieSignerInterface` constructor argument
+     (plus an optional `Security`), and `AbstractOAuthCallbackController` gained a
+     `StateCookieSignerInterface` argument.
+   - Implement `findUserByIdentifier(string $identifier): ?UserInterface` on your callback
+     subclass (typically `$userProvider->loadUserByIdentifier($identifier)`) — it recovers the
+     link-initiating user from the verified cookie on a cross-site callback.
+   - Mark any provider whose callback is a cross-site `form_post` (e.g. Apple) with
+     `FormPostOAuthProviderInterface`.

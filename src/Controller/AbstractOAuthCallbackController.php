@@ -18,6 +18,7 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderRegistryInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthUserInfoInterface;
+use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 abstract class AbstractOAuthCallbackController
 {
@@ -30,6 +31,7 @@ abstract class AbstractOAuthCallbackController
         protected TokenStorageInterface $tokenStorage,
         protected Security $security,
         protected LoggerInterface $logger,
+        protected StateCookieSignerInterface $stateCookieSigner,
     ) {
     }
 
@@ -236,7 +238,10 @@ abstract class AbstractOAuthCallbackController
     protected function readStateCookie(Request $request, string $provider): array
     {
         $raw = $request->cookies->get($this->getStateSessionKey() . '_' . $provider);
-        $decoded = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
+        // Verify the HMAC before trusting any field: the cookie travels on a cross-site request
+        // an attacker can craft directly, so an unsigned/forged value (e.g. `user` set to a
+        // victim) must be rejected rather than decoded.
+        $decoded = is_string($raw) && $raw !== '' ? $this->stateCookieSigner->decode($raw) : null;
         if (! is_array($decoded)) {
             return ['', 'login', null];
         }
