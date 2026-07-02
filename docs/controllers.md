@@ -219,6 +219,8 @@ Every abstract controller shares the **constructor pattern** from the [worked ex
 - `AbstractOAuthConfirmLinkController` — issue + verify an ownership-proof challenge, then link the existing user.
   `getConfirmPendingSessionKey`, `getFirewallName`, `getLoginRoute`, `getDashboardUrl`, `getTemplate`, `getAuditChannel`, `getAuditUserIdKey`, `findUserByEmail($email): ?UserInterface`, `findExistingLink($provider, $providerUserId): ?SocialAccountLinkRecordInterface`, `isLinkOwnedByUser($existing, $user): bool`, `linkExistingUser($user, $info)`, `handlePostLogin($user, $request)`, `prepareChallenge($user, $pending, $request)` (issue the proof — e.g. email a one-time code), `verifyChallenge($user, $pending, $request): ?string` (`null` on success, otherwise a translation key)
 
+  The one-time-code building blocks are provided, so the two hooks stay thin: `OAuthLinkCodeGenerator` mints/SHA-256-hashes the code and `CodeChallengeValidator` runs the verify (expiry + attempt limit + single-use + constant-time compare, returning a verdict + the next state to persist). So `prepareChallenge` only issues/re-sends the code (e.g. email) and stashes its state in the pending session array; `verifyChallenge` hashes the submitted value, calls the validator, persists the returned state and maps the verdict to a translation key — neither re-implements the security logic. Same "reuse the concrete, write only the glue" pattern as the [magic-link validator](interface-implementations.md).
+
 ### Authentication — two-factor
 
 - `AbstractTwoFactorSetupController` — TOTP + QR + recovery-code setup wizard.
