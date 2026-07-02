@@ -12,7 +12,7 @@ The bundle ships **contracts**, not implementations. For each enabled feature, y
 | `PasskeyAssertionVerifierInterface` | If passkey login enabled | Repository lookup by `credentialId` + WebAuthn verify via bundle's `PasskeyValidatorFactory` |
 | `UserAnonymizerInterface` | If GDPR self-service account deletion enabled | Clears name / email / phone / address on the user once the grace period expires (driven by `DueDeletionsProcessorInterface`) |
 | `OAuthProviderInterface` *(× N)* | Only if you add providers beyond Google/Apple/Microsoft (bundle ships those three) | Provider-specific OAuth2 client wrapper, tag with `three_brs.oauth_provider` |
-| `FormPostOAuthProviderInterface` *(marker)* | Only on a provider whose callback is a cross-site `form_post` (e.g. Apple — already marked) | No methods — opt-in marker; makes the OAuth controllers carry the `state` in a dedicated `SameSite=None; Secure; HttpOnly` single-use cookie that survives the cross-site POST, instead of the session |
+| `FormPostOAuthProviderInterface` *(marker)* | Only on a provider whose callback is a cross-site `form_post` (e.g. Apple — already marked) | No methods — opt-in marker; makes the OAuth controllers carry the `state` in a dedicated `SameSite=None; Secure; HttpOnly`, HMAC-signed single-use cookie (signed by `StateCookieSigner`) that survives the cross-site POST and is tamper-proof, instead of the session |
 
 ## Reference impl: Settings provider (Doctrine-backed)
 

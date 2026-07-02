@@ -20,8 +20,7 @@
 5. **`PasskeyAssertionResultInterface::isUserVerified()` is gone** — only
    `getUser()` is required now.
 
-## 1.1 → X.Y
-
+## 1.1 → 2.0
 
 1. **Password-login control is now scope-wide, not per-user.** If you extended
    `AbstractPasswordLoginCheckListener`:
