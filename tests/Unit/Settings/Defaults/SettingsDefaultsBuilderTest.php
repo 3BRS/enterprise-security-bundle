@@ -187,7 +187,7 @@ class SettingsDefaultsBuilderTest extends TestCase
                 'customer' => $perScopeFeature(),
                 'admin' => $perScopeFeature(),
             ],
-            'password_login_control' => [
+            'password_login' => [
                 'customer' => $perScopeFeature(),
                 'admin' => $perScopeFeature(),
             ],

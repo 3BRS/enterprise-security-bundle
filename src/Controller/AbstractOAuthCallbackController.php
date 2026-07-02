@@ -6,6 +6,7 @@ namespace ThreeBRS\EnterpriseSecurityBundle\Controller;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,8 +15,10 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
+use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderRegistryInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthUserInfoInterface;
+use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 abstract class AbstractOAuthCallbackController
 {
@@ -28,6 +31,7 @@ abstract class AbstractOAuthCallbackController
         protected TokenStorageInterface $tokenStorage,
         protected Security $security,
         protected LoggerInterface $logger,
+        protected StateCookieSignerInterface $stateCookieSigner,
     ) {
     }
 
@@ -38,12 +42,22 @@ abstract class AbstractOAuthCallbackController
         }
 
         $oauthProvider = $this->registry->get($provider);
+        $isFormPost = $oauthProvider instanceof FormPostOAuthProviderInterface;
 
         $session = $request->getSession();
-        $expectedState = (string) $session->get($this->getStateSessionKey() . '_' . $provider, '');
-        $session->remove($this->getStateSessionKey() . '_' . $provider);
-        $intent = (string) $session->get($this->getIntentSessionKey(), 'login');
-        $session->remove($this->getIntentSessionKey());
+        $linkUserIdentifier = null;
+
+        if ($isFormPost) {
+            // Cross-site form_post callback (e.g. Apple): the SameSite=Lax session cookie is
+            // not sent, so state / intent / link-user travel in the dedicated SameSite=None
+            // cookie set on initiate.
+            [$expectedState, $intent, $linkUserIdentifier] = $this->readStateCookie($request, $provider);
+        } else {
+            $expectedState = (string) $session->get($this->getStateSessionKey() . '_' . $provider, '');
+            $session->remove($this->getStateSessionKey() . '_' . $provider);
+            $intent = (string) $session->get($this->getIntentSessionKey(), 'login');
+            $session->remove($this->getIntentSessionKey());
+        }
 
         $redirectUri = $this->router->generate(
             $this->getCallbackRouteName(),
@@ -58,25 +72,51 @@ abstract class AbstractOAuthCallbackController
         } catch (OAuthProviderException $exception) {
             $this->addFlashMessage($request, 'error', $exception->getMessage());
 
-            return new RedirectResponse($this->router->generate($this->getLoginRoute()));
+            return $this->withClearedStateCookie(
+                new RedirectResponse($this->router->generate($this->getLoginRoute())),
+                $isFormPost,
+                $provider,
+            );
         }
 
-        if ($intent === 'link') {
-            return $this->handleLinkIntent($request, $info);
-        }
+        $response = $intent === 'link'
+            ? $this->handleLinkIntent($request, $info, $linkUserIdentifier)
+            : $this->handleLoginIntent($request, $info);
 
-        return $this->handleLoginIntent($request, $info);
+        return $this->withClearedStateCookie($response, $isFormPost, $provider);
     }
 
-    protected function handleLinkIntent(Request $request, OAuthUserInfoInterface $info): Response
+    protected function handleLinkIntent(Request $request, OAuthUserInfoInterface $info, ?string $linkUserIdentifier = null): Response
     {
         $currentUser = $this->security->getUser();
+        $sessionlessLink = false;
+
+        // Cross-site form_post callback (e.g. Apple): the auth session cookie is not sent, so
+        // the logged-in user cannot be read from the security context. The initiate step
+        // captured the authenticated user's identifier into the single-use state cookie;
+        // resolve them from it. The link is thus bound to that cookie value rather than a live
+        // session — acceptable because the cookie is HttpOnly + Secure + SameSite=None +
+        // single-use and the OAuth state is validated. (A stricter alternative is to complete
+        // the link on a follow-up same-site request; see docs/oauth-social-login.md.)
+        if ($currentUser === null && $linkUserIdentifier !== null && $linkUserIdentifier !== '') {
+            $currentUser = $this->findUserByIdentifier($linkUserIdentifier);
+            $sessionlessLink = true;
+        }
+
         if (! $this->isAcceptableCurrentUser($currentUser)) {
             $this->addFlashMessage($request, 'error', 'three_brs.ui.social_login.not_logged_in');
 
             return new RedirectResponse($this->router->generate($this->getLoginRoute()));
         }
         \assert($currentUser instanceof UserInterface);
+
+        // The cross-site form_post callback carried no session, so the response will set a
+        // brand-new session cookie (triggered by the flash writes below) that overwrites the
+        // user's real one — silently signing them out. Re-establish their authenticated
+        // session first so linking keeps them logged in.
+        if ($sessionlessLink) {
+            $this->authenticate($request, $currentUser);
+        }
 
         $existing = $this->findExistingLinkUser($info);
         if ($existing !== null && $existing->getUserIdentifier() !== $currentUser->getUserIdentifier()) {
@@ -189,6 +229,50 @@ abstract class AbstractOAuthCallbackController
         ], $extra));
     }
 
+    /**
+     * Reads the dedicated state cookie set on initiate for form_post providers.
+     *
+     * @return array{0: string, 1: string, 2: ?string} the expected state, the intent, and the
+     *                                                  link-initiating user identifier (if any)
+     */
+    protected function readStateCookie(Request $request, string $provider): array
+    {
+        $raw = $request->cookies->get($this->getStateSessionKey() . '_' . $provider);
+        // Verify the HMAC before trusting any field: the cookie travels on a cross-site request
+        // an attacker can craft directly, so an unsigned/forged value (e.g. `user` set to a
+        // victim) must be rejected rather than decoded.
+        $decoded = is_string($raw) && $raw !== '' ? $this->stateCookieSigner->decode($raw) : null;
+        if (! is_array($decoded)) {
+            return ['', 'login', null];
+        }
+
+        $state = isset($decoded['state']) && is_string($decoded['state']) ? $decoded['state'] : '';
+        $intent = isset($decoded['intent']) && is_string($decoded['intent']) ? $decoded['intent'] : 'login';
+        if (! in_array($intent, ['login', 'link'], true)) {
+            $intent = 'login';
+        }
+        $user = isset($decoded['user']) && is_string($decoded['user']) ? $decoded['user'] : null;
+
+        return [$state, $intent, $user];
+    }
+
+    protected function withClearedStateCookie(Response $response, bool $isFormPost, string $provider): Response
+    {
+        if ($isFormPost) {
+            // Single-use: drop the dedicated state cookie once the callback has consumed it.
+            $response->headers->clearCookie(
+                $this->getStateSessionKey() . '_' . $provider,
+                '/',
+                null,
+                true,
+                true,
+                Cookie::SAMESITE_NONE,
+            );
+        }
+
+        return $response;
+    }
+
     abstract protected function getOAuthGroup(): string;
 
     abstract protected function getCallbackRouteName(): string;
@@ -218,6 +302,12 @@ abstract class AbstractOAuthCallbackController
     abstract protected function findExistingLinkUser(OAuthUserInfoInterface $info): ?UserInterface;
 
     abstract protected function findUserByEmail(string $email): ?UserInterface;
+
+    /**
+     * Resolves a user from the firewall's identifier (used to recover the link-initiating
+     * user on a cross-site form_post callback where the session is unavailable).
+     */
+    abstract protected function findUserByIdentifier(string $identifier): ?UserInterface;
 
     abstract protected function canAutoRegister(OAuthUserInfoInterface $info): bool;
 

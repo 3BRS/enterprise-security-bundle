@@ -11,9 +11,9 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Credentials\PasswordC
 use Symfony\Component\Security\Http\Event\CheckPassportEvent;
 
 /**
- * Blocks a password-credentials login attempt when the resolved user has the per-user
- * password-login toggle disabled. OAuth / passkey / magic-link flows are untouched because
- * their passports do not carry a `PasswordCredentials` badge.
+ * Blocks a password-credentials login attempt when password (email + password) login is
+ * disabled for the resolved user's scope. OAuth / passkey / magic-link flows are untouched
+ * because their passports do not carry a `PasswordCredentials` badge.
  *
  * Subclass binds the listener to a single user type (Customer vs AdminUser) — Symfony's
  * security event dispatchers fire per-firewall, but the same listener subscribes to all of
@@ -21,11 +21,6 @@ use Symfony\Component\Security\Http\Event\CheckPassportEvent;
  */
 abstract class AbstractPasswordLoginCheckListener implements EventSubscriberInterface
 {
-    public function __construct(
-        protected PasswordLoginPreferenceRepositoryInterface $preferenceRepository,
-    ) {
-    }
-
     public static function getSubscribedEvents(): array
     {
         // Priority 256 runs the check before Symfony's CheckCredentialsListener (which
@@ -44,26 +39,24 @@ abstract class AbstractPasswordLoginCheckListener implements EventSubscriberInte
             return;
         }
 
-        $user = $passport->getUser();
-        if (! $this->isAcceptableUser($user)) {
+        if (! $this->isAcceptableUser($passport->getUser())) {
             return;
         }
 
-        // Feature gate lives behind an abstract hook so the bundle stays
-        // settings-agnostic; the concrete binds it to the relevant scope toggle.
-        // When the feature is off, existing per-user preferences are ignored.
-        if (! $this->isFeatureEnabled()) {
-            return;
-        }
-
-        if ($this->preferenceRepository->isPasswordLoginAllowedForUser($user)) {
+        if ($this->isPasswordLoginEnabled()) {
             return;
         }
 
         throw new CustomUserMessageAuthenticationException($this->getErrorMessageKey());
     }
 
-    abstract protected function isFeatureEnabled(): bool;
+    /**
+     * Whether password (email + password) login is enabled for this listener's scope. Lives
+     * behind an abstract hook so the bundle stays settings-agnostic; the concrete binds it to
+     * the relevant scope toggle. When it returns false, every password login for the bound
+     * user type is rejected — regardless of which other sign-in methods the user has.
+     */
+    abstract protected function isPasswordLoginEnabled(): bool;
 
     abstract protected function isAcceptableUser(UserInterface $user): bool;
 

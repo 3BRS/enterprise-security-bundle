@@ -19,7 +19,6 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Security\Http\Event\CheckPassportEvent;
 use ThreeBRS\EnterpriseSecurityBundle\PasswordLoginControl\AbstractPasswordLoginCheckListener;
-use ThreeBRS\EnterpriseSecurityBundle\PasswordLoginControl\PasswordLoginPreferenceRepositoryInterface;
 
 #[CoversClass(AbstractPasswordLoginCheckListener::class)]
 class AbstractPasswordLoginCheckListenerTest extends TestCase
@@ -35,91 +34,60 @@ class AbstractPasswordLoginCheckListenerTest extends TestCase
     public function testIgnoresPassportWithoutPasswordBadge(): void
     {
         // OAuth / passkey / magic-link passports never carry a PasswordCredentials badge —
-        // the listener must not interfere with them. Mock's expects(never) asserts the
-        // repository was not consulted at all.
-        $user = $this->createStub(UserInterface::class);
-        $repo = $this->createMock(PasswordLoginPreferenceRepositoryInterface::class);
-        $repo->expects(self::never())->method('isPasswordLoginAllowedForUser');
+        // the listener must not interfere with them, even when password login is disabled.
+        self::expectNotToPerformAssertions();
 
+        $user = $this->createStub(UserInterface::class);
         $passport = new SelfValidatingPassport(new UserBadge('u', static fn () => $user));
         $event = new CheckPassportEvent($this->stubAuthenticator(), $passport);
 
-        $this->listener($repo, true)->onCheckPassport($event);
+        $this->listener(acceptable: true, passwordLoginEnabled: false)->onCheckPassport($event);
     }
 
     public function testIgnoresUnacceptableUser(): void
     {
         // Wrong user type for this listener (admin listener seeing a shop user, or vice versa).
-        // Mock's expects(never) asserts the repository was not consulted.
-        $user = $this->createStub(UserInterface::class);
-        $repo = $this->createMock(PasswordLoginPreferenceRepositoryInterface::class);
-        $repo->expects(self::never())->method('isPasswordLoginAllowedForUser');
+        self::expectNotToPerformAssertions();
 
+        $user = $this->createStub(UserInterface::class);
         $event = $this->eventWithPasswordBadge($user);
 
-        $this->listener($repo, acceptable: false)->onCheckPassport($event);
+        $this->listener(acceptable: false, passwordLoginEnabled: false)->onCheckPassport($event);
     }
 
-    public function testIgnoresWhenFeatureDisabled(): void
+    public function testAllowsPasswordLoginWhenEnabled(): void
     {
-        // Feature toggled off for the scope — existing per-user preferences must be
-        // ignored, so the repository is never consulted and no exception is thrown.
-        $user = $this->createStub(UserInterface::class);
-        $repo = $this->createMock(PasswordLoginPreferenceRepositoryInterface::class);
-        $repo->expects(self::never())->method('isPasswordLoginAllowedForUser');
+        self::expectNotToPerformAssertions();
 
+        $user = $this->createStub(UserInterface::class);
         $event = $this->eventWithPasswordBadge($user);
 
-        $this->listener($repo, acceptable: true, featureEnabled: false)->onCheckPassport($event);
+        $this->listener(acceptable: true, passwordLoginEnabled: true)->onCheckPassport($event);
     }
 
-    public function testAllowsPasswordLoginWhenPreferenceAllowed(): void
-    {
-        // Mock's expects(once) asserts the repository WAS consulted and the listener
-        // did not throw on its `true` answer.
-        $user = $this->createStub(UserInterface::class);
-        $repo = $this->createMock(PasswordLoginPreferenceRepositoryInterface::class);
-        $repo->expects(self::once())
-            ->method('isPasswordLoginAllowedForUser')
-            ->with($user)
-            ->willReturn(true);
-
-        $event = $this->eventWithPasswordBadge($user);
-
-        $this->listener($repo, true)->onCheckPassport($event);
-    }
-
-    public function testThrowsWhenPasswordLoginDisabledForUser(): void
+    public function testThrowsWhenPasswordLoginDisabled(): void
     {
         $user = $this->createStub(UserInterface::class);
-        $repo = $this->createStub(PasswordLoginPreferenceRepositoryInterface::class);
-        $repo->method('isPasswordLoginAllowedForUser')->willReturn(false);
-
         $event = $this->eventWithPasswordBadge($user);
 
         $this->expectException(CustomUserMessageAuthenticationException::class);
-        $this->expectExceptionMessage('three_brs.password_login_control.disabled_for_user');
+        $this->expectExceptionMessage('three_brs.password_login.disabled');
 
-        $this->listener($repo, true)->onCheckPassport($event);
+        $this->listener(acceptable: true, passwordLoginEnabled: false)->onCheckPassport($event);
     }
 
-    protected function listener(
-        PasswordLoginPreferenceRepositoryInterface $repository,
-        bool $acceptable,
-        bool $featureEnabled = true,
-    ): AbstractPasswordLoginCheckListener {
-        return new class($repository, $acceptable, $featureEnabled) extends AbstractPasswordLoginCheckListener {
+    protected function listener(bool $acceptable, bool $passwordLoginEnabled): AbstractPasswordLoginCheckListener
+    {
+        return new class($acceptable, $passwordLoginEnabled) extends AbstractPasswordLoginCheckListener {
             public function __construct(
-                PasswordLoginPreferenceRepositoryInterface $repository,
                 private bool $acceptable,
-                private bool $featureEnabled,
+                private bool $passwordLoginEnabled,
             ) {
-                parent::__construct($repository);
             }
 
-            protected function isFeatureEnabled(): bool
+            protected function isPasswordLoginEnabled(): bool
             {
-                return $this->featureEnabled;
+                return $this->passwordLoginEnabled;
             }
 
             protected function isAcceptableUser(UserInterface $user): bool
@@ -129,7 +97,7 @@ class AbstractPasswordLoginCheckListenerTest extends TestCase
 
             protected function getErrorMessageKey(): string
             {
-                return 'three_brs.password_login_control.disabled_for_user';
+                return 'three_brs.password_login.disabled';
             }
         };
     }

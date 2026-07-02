@@ -129,6 +129,15 @@ services:
         arguments:
             $clock: '@clock'
 
+    # OAuth account-link confirmation code
+
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthLinkCodeGenerator: ~
+
+    # OAuth state-cookie signer (HMAC) — authenticates the cross-site form_post state cookie
+    ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSigner:
+        arguments:
+            $secret: '%kernel.secret%'
+
     # Timing padding
 
     ThreeBRS\EnterpriseSecurityBundle\Timing\DeadlineTimingPadding: ~

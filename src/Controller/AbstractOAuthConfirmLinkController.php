@@ -8,10 +8,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
-use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthUserInfo;
@@ -25,7 +23,6 @@ abstract class AbstractOAuthConfirmLinkController
     use FlashHelperTrait;
 
     public function __construct(
-        protected UserPasswordHasherInterface $passwordHasher,
         protected TokenStorageInterface $tokenStorage,
         protected RouterInterface $router,
         protected Environment $twig,
@@ -52,18 +49,13 @@ abstract class AbstractOAuthConfirmLinkController
 
         $error = null;
         if ($request->isMethod('POST')) {
-            $password = (string) $request->request->get('_password');
-            if (
-                $password === ''
-                || ! $user instanceof PasswordAuthenticatedUserInterface
-                || ! $this->passwordHasher->isPasswordValid($user, $password)
-            ) {
+            $error = $this->verifyChallenge($user, $pending, $request);
+            if ($error !== null) {
                 $this->logger->info($this->getAuditChannel() . '.confirm_link_failed', [
                     'provider' => (string) $pending['provider'],
                     'email' => $email,
                     'ip' => $request->getClientIp(),
                 ]);
-                $error = 'three_brs.ui.social_login.invalid_password';
             } else {
                 $provider = (string) $pending['provider'];
                 $providerUserId = (string) $pending['provider_user_id'];
@@ -104,6 +96,8 @@ abstract class AbstractOAuthConfirmLinkController
                     $this->resolveRedirectUrl($request, $this->getFirewallName(), $this->getDashboardUrl()),
                 );
             }
+        } else {
+            $this->prepareChallenge($user, $pending, $request);
         }
 
         return new Response($this->twig->render($this->getTemplate(), [
@@ -157,4 +151,22 @@ abstract class AbstractOAuthConfirmLinkController
     abstract protected function linkExistingUser(UserInterface $user, OAuthUserInfoInterface $info): void;
 
     abstract protected function handlePostLogin(UserInterface $user, Request $request): void;
+
+    /**
+     * Issues the ownership-proof challenge for the matched account (e.g. emails a one-time
+     * code). Called on the initial GET render and should be idempotent across refreshes
+     * (only (re)issue when needed). May stash challenge state into the pending session array
+     * stored under {@see getConfirmPendingSessionKey()}.
+     *
+     * @param array<string, mixed> $pending
+     */
+    abstract protected function prepareChallenge(UserInterface $user, array $pending, Request $request): void;
+
+    /**
+     * Verifies the submitted ownership proof on POST. Returns null on success, otherwise a
+     * translation key describing the failure (rendered back on the confirm-link page).
+     *
+     * @param array<string, mixed> $pending
+     */
+    abstract protected function verifyChallenge(UserInterface $user, array $pending, Request $request): ?string;
 }

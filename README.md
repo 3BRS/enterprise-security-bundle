@@ -17,7 +17,7 @@
     </a>
 </h1>
 
-A standalone Symfony bundle providing reusable security primitives — two-factor authentication, passkeys (WebAuthn/FIDO2), magic-link login, OAuth (Google, Apple, Microsoft), account lockout with rate limiting, session tracking, IP whitelist/blacklist, password policy / history / expiration, per-user password-login control, GDPR self-service account deletion, and a runtime-configurable settings store.
+A standalone Symfony bundle providing reusable security primitives — two-factor authentication, passkeys (WebAuthn/FIDO2), magic-link login, OAuth (Google, Apple, Microsoft), account lockout with rate limiting, session tracking, IP whitelist/blacklist, password policy / history / expiration, scope-wide password-login control, GDPR self-service account deletion, and a runtime-configurable settings store.
 
 The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It ships **contracts and abstract flows, not a wired-up UI** — you bind it to your app's entities, routes and templates. See the [integration guide](#integration-guide) below for how to wire it into a Symfony project.
 
@@ -39,12 +39,12 @@ The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It 
 - **2FA:** `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator`, `TwoFactorEnforcementChecker` (+ `TwoFactorMode` enum), `TwoFactorAwareAuthenticationSuccessHandler`
 - **Magic link:** `MagicLinkTokenGenerator`, `MagicLinkTokenValidator`
 - **Passkey:** `PasskeyValidatorFactory`, `PasskeyCeremonyStepManagerFactory`, `PasskeyRelyingPartyEntityFactory`, `PasskeyWebauthnSerializer`, `SessionPasskeyOptionsStorage`
-- **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`
+- **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`, `OAuthLinkCodeGenerator` (confirm-link one-time-code helper)
 - **Lockout & rate limiting:** `LockoutPolicy`, `RateLimitGuard`, `DynamicRateLimiterFactory`
 - **Sessions:** `UserAgentParser`, `SessionFingerprintGenerator`, `GeoIpLookup` (MaxMind + Null impls)
 - **Passwords:** `PasswordExpirationChecker`, `PasswordSimilarityChecker` (history), `PasswordPolicyFilteringValidator` + `PasswordPolicy` / `PasswordHistory` Symfony constraints
 - **Network:** `CidrMatcher`, `CidrList` constraint, `AbstractIpRestrictionChecker` / `AbstractIpRestrictionListener` (whitelist + blacklist enforcement)
-- **Per-user password-login control:** `AbstractPasswordLoginCheckListener` (forces stronger methods)
+- **Password-login control:** `AbstractPasswordLoginCheckListener` (disable password sign-in per scope; forces stronger methods)
 - **Account deletion (GDPR):** `GracePeriodCalculator`, `AbstractDueDeletionsProcessor` (anonymization cron engine)
 - **Settings store:** `FeatureToggle`, `PolicyFactory`, `YamlConfigDefaultsProvider` (runtime-configurable, scoped CUSTOMER / ADMIN / GLOBAL)
 - **Hardening:** `DeadlineTimingPadding` — constant-time response padding against account enumeration
@@ -75,7 +75,7 @@ The bundle covers 16 security features. Each row maps the feature to the bundle 
 | Admin IP Whitelist | `CidrMatcher` + `CidrList` constraint + IP restriction listener | [admin-ip-whitelist](docs/features/admin-ip-whitelist.md) |
 | Admin IP Blacklist | same IP restriction primitives (global deny list) | [admin-ip-blacklist](docs/features/admin-ip-blacklist.md) |
 | Admin Customer Management | session / lockout / password primitives | [admin-customer-management](docs/features/admin-customer-management.md) |
-| Per-User Password Login Control | `AbstractPasswordLoginCheckListener` + preference contracts | [per-user-password-login-control](docs/features/per-user-password-login-control.md) |
+| Password Login Control | `AbstractPasswordLoginCheckListener` (scope-wide toggle) | [password-login](docs/features/password-login.md) |
 
 ---
 
