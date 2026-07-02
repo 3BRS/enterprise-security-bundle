@@ -39,7 +39,7 @@ The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It 
 - **2FA:** `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator`, `TwoFactorEnforcementChecker` (+ `TwoFactorMode` enum), `TwoFactorAwareAuthenticationSuccessHandler`
 - **Magic link:** `MagicLinkTokenGenerator`, `MagicLinkTokenValidator`
 - **Passkey:** `PasskeyValidatorFactory`, `PasskeyCeremonyStepManagerFactory`, `PasskeyRelyingPartyEntityFactory`, `PasskeyWebauthnSerializer`, `SessionPasskeyOptionsStorage`
-- **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`, `OAuthLinkCodeGenerator` (confirm-link one-time-code helper)
+- **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`, `OAuthLinkCodeGenerator` + `CodeChallengeValidator` (confirm-link one-time-code: mint/hash, then verify with expiry + attempt limit + single-use)
 - **Lockout & rate limiting:** `LockoutPolicy`, `RateLimitGuard`, `DynamicRateLimiterFactory`
 - **Sessions:** `UserAgentParser`, `SessionFingerprintGenerator`, `GeoIpLookup` (MaxMind + Null impls)
 - **Passwords:** `PasswordExpirationChecker`, `PasswordSimilarityChecker` (history), `PasswordPolicyFilteringValidator` + `PasswordPolicy` / `PasswordHistory` Symfony constraints
@@ -65,7 +65,7 @@ The bundle covers 16 security features. Each row maps the feature to the bundle 
 | Password Expiration | `PasswordExpirationChecker` + user mixins | [password-expiration](docs/features/password-expiration.md) |
 | Password Change Notifications | `password_change_notification.enabled` settings toggle (notification is app-level) | [password-change-notifications](docs/features/password-change-notifications.md) |
 | Two-Factor Authentication | TOTP / QR / recovery generators + enforcement checker + flow controllers | [two-factor-authentication](docs/features/two-factor-authentication.md) |
-| 3rd-party OAuth (Social Login) | provider registry + Google/Apple/Microsoft + auto-registration policy | [oauth-social-login](docs/features/oauth-social-login.md) |
+| 3rd-party OAuth (Social Login) | provider registry + Google/Apple/Microsoft + auto-registration policy + confirm-link code challenge (generator + validator) | [oauth-social-login](docs/features/oauth-social-login.md) |
 | Magic Link Login | token generator/validator + timing padding + flow controllers | [magic-link-login](docs/features/magic-link-login.md) |
 | Passkey Login (WebAuthn/FIDO2) | WebAuthn serializer + validator factories + flow controllers | [passkey-login](docs/features/passkey-login.md) |
 | Account Lockout & Rate Limiting | `LockoutPolicy` + `RateLimitGuard` + `DynamicRateLimiterFactory` | [account-lockout-rate-limiting](docs/features/account-lockout-rate-limiting.md) |

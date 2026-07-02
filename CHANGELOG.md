@@ -9,6 +9,10 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 ### Added
 - `OAuthLinkCodeGenerator` (`OAuthLinkCodeGeneratorInterface`) — optional confirm-link helper
   that mints a zero-padded 6-digit one-time code and SHA-256-hashes it for storage/comparison.
+- `CodeChallengeValidator` (`CodeChallengeValidatorInterface`) — optional confirm-link helper for
+  the **verify** half of a one-time-code challenge: enforces expiry + attempt limit + single-use +
+  constant-time compare over a transport-agnostic `CodeChallengeState`, returning a
+  `CodeChallengeOutcome` (verdict + next state to persist). Clock-driven; never touches the session.
 - Cross-site `form_post` OAuth provider support (e.g. Apple Sign In): the
   `FormPostOAuthProviderInterface` opt-in marker plus a dedicated `SameSite=None; Secure;
   HttpOnly` single-use **HMAC-signed** state cookie carrying state / intent / link-initiating

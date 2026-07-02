@@ -138,6 +138,12 @@ services:
         arguments:
             $secret: '%kernel.secret%'
 
+    # One-time code challenge (expiry + attempt limit + single-use + constant-time compare)
+
+    ThreeBRS\EnterpriseSecurityBundle\Challenge\CodeChallengeValidator:
+        arguments:
+            $clock: '@clock'
+
     # Timing padding
 
     ThreeBRS\EnterpriseSecurityBundle\Timing\DeadlineTimingPadding: ~

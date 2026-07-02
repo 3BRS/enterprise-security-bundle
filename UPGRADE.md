@@ -53,9 +53,12 @@
    - Update your confirm-link template/form: stop submitting `_password`, submit whatever
      `verifyChallenge()` reads, and define/translate your own failure key — the base no longer
      emits `three_brs.ui.social_login.invalid_password`.
-   - (Optional) `OAuthLinkCodeGenerator` is a ready-made helper for a code-based challenge:
-     `generateCode()` mints the 6-digit code, `hash()` (SHA-256) stores/compares it. Reference
-     it by its concrete service id — there is no interface alias for autowiring.
+   - (Optional) The bundle ships both halves of a code-based challenge, so you don't re-implement
+     the security logic: `OAuthLinkCodeGenerator` mints the 6-digit code and SHA-256-hashes it
+     (use in `prepareChallenge`); `CodeChallengeValidator` runs the verify — expiry + attempt
+     limit + single-use + constant-time compare — returning a verdict plus the next challenge
+     state to persist (use in `verifyChallenge`). Reference both by their concrete service ids;
+     there is no interface alias for autowiring.
 
 3. **OAuth cross-site `form_post` providers (Apple) now use a signed state cookie.** If you
    extended the OAuth initiate/callback controllers:
