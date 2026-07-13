@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthUserInfo;
@@ -19,6 +20,7 @@ use Twig\Environment;
 
 abstract class AbstractOAuthConfirmLinkController
 {
+    use AccountStateGuardTrait;
     use FirewallRedirectTrait;
     use FlashHelperTrait;
 
@@ -27,7 +29,9 @@ abstract class AbstractOAuthConfirmLinkController
         protected RouterInterface $router,
         protected Environment $twig,
         protected LoggerInterface $logger,
+        UserCheckerInterface $userChecker,
     ) {
+        $this->userChecker = $userChecker;
     }
 
     public function __invoke(Request $request): Response
@@ -43,6 +47,20 @@ abstract class AbstractOAuthConfirmLinkController
         $user = $this->findUserByEmail($email);
         if ($user === null) {
             $session->remove($this->getConfirmPendingSessionKey());
+
+            return new RedirectResponse($this->router->generate($this->getLoginRoute()));
+        }
+
+        // Refused before the challenge, and before the link it would create: the account state is
+        // checked here as well as on the callback, because the pending link outlives that request.
+        if (! $this->isAccountAllowedToSignIn($user)) {
+            $session->remove($this->getConfirmPendingSessionKey());
+
+            $this->logger->info($this->getAuditChannel() . '.confirm_link_refused_account_state', [
+                $this->getAuditUserIdKey() => $user->getUserIdentifier(),
+                'ip' => $request->getClientIp(),
+            ]);
+            $this->addFlashMessage($request, 'error', static::ACCOUNT_REFUSED_MESSAGE);
 
             return new RedirectResponse($this->router->generate($this->getLoginRoute()));
         }

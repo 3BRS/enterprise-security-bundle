@@ -18,6 +18,45 @@ security:
             # ... your existing form_login, json_login, etc.
 ```
 
+## Account-state checker for the sign-in controllers
+
+The magic-link, passkey, OAuth and two-factor-recovery controllers write the token themselves, which means the firewall's user checker never runs for them. Each takes a `UserCheckerInterface` as its **last constructor argument** and calls `checkPreAuth()` before signing anyone in — otherwise an account you disabled could sign straight back in through any of those routes.
+
+Bind a checker that refuses on the **account state alone**. It must throw `DisabledException` for an account that may not sign in, and **nothing else**:
+
+- not `LockedException` — an account locked by failed password attempts has to keep its passwordless way in, otherwise anyone can lock a victim out of their own passkey by guessing their password wrong often enough;
+- not `CredentialsExpiredException` — an expired password must not close the routes its owner needs to recover.
+
+The bundle ships no such checker, because "enabled" is not part of Symfony's `UserInterface` — it belongs to your model. Either reuse the one your password firewall already has, or write it:
+
+```php
+// src/Security/AccountStateChecker.php
+class AccountStateChecker implements UserCheckerInterface
+{
+    public function checkPreAuth(UserInterface $user): void
+    {
+        if ($user instanceof AppUser && ! $user->isEnabled()) {
+            throw new DisabledException();
+        }
+    }
+
+    public function checkPostAuth(UserInterface $user): void
+    {
+    }
+}
+```
+
+```yaml
+# config/services.yaml — pass it to every controller that extends one of the five abstracts
+services:
+    App\Controller\MagicLinkVerifyController:
+        arguments:
+            # … the bundle's other arguments
+            $userChecker: '@App\Security\AccountStateChecker'
+```
+
+Translate `three_brs.account_state.sign_in_refused` — the key those controllers flash when they turn a refused account away. (The passkey verify endpoint answers `403` instead; it is consumed by a `fetch()`, not rendered.)
+
 ## Two-factor authentication
 
 Install `scheb/2fa-bundle` (auto-pulled by this bundle) and configure it per its [docs](https://github.com/scheb/2fa). Minimum:

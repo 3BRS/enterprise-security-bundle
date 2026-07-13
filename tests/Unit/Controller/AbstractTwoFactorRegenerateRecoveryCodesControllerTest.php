@@ -70,7 +70,7 @@ class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
 
         // Constructor says enabled=false (would redirect to dashboard), but the
         // subclass override flips it to true and asks for 4 codes — ensuring
-        // subclasses that read settings at runtime (the plugin pattern) are
+        // subclasses that read settings at runtime (the consumer pattern) are
         // honoured by `__invoke` instead of being shadowed by the cached
         // constructor parameters.
         $controller = $this->makeController(

@@ -18,6 +18,7 @@ Passwordless sign-in with passkeys — platform authenticators (Touch ID, Window
 
 **Behaviour:**
 - **Bypasses 2FA.** `AbstractPasskeyLoginVerifyController` writes the authenticated token directly (like OAuth and magic link), so scheb's two-factor challenge is **not** triggered after a passkey sign-in. A passkey already proves possession of the registered authenticator; the second factor only guards plain password login.
+- **Enforces the account state.** Writing the token outside the firewall also skips the firewall's user checker, so the controller runs it itself (`AccountStateGuardTrait`): an account disabled by an administrator — or with a self-service deletion pending — is refused here just as it is on the password form. The refusal happens **before the token is written**, and the verify endpoint answers a `403` (it is consumed by a `fetch()`, so a redirect would be of no use to the button). Bind the account-state checker alone, not the whole firewall chain: an account locked by failed password attempts must keep its passwordless way in, or anyone could lock a victim out of their own passkey by guessing their password wrong often enough.
 - **Last-method guard.** `AbstractPasskeyDeleteController` refuses to remove a user's last remaining sign-in method.
 
 ## Front-end

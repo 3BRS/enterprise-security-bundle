@@ -57,7 +57,7 @@ abstract class AbstractTwoFactorRegenerateRecoveryCodesController
 
     /**
      * Delete previous recovery codes and persist hashes of the supplied plain codes.
-     * Plugin subclass owns the entity manager + recovery-code repository + entity factory.
+     * A subclass owns the entity manager + recovery-code repository + entity factory.
      *
      * @param array<int, string> $plainCodes
      */

@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
@@ -22,6 +23,7 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 abstract class AbstractOAuthCallbackController
 {
+    use AccountStateGuardTrait;
     use FirewallRedirectTrait;
     use FlashHelperTrait;
 
@@ -32,7 +34,9 @@ abstract class AbstractOAuthCallbackController
         protected Security $security,
         protected LoggerInterface $logger,
         protected StateCookieSignerInterface $stateCookieSigner,
+        UserCheckerInterface $userChecker,
     ) {
+        $this->userChecker = $userChecker;
     }
 
     public function __invoke(Request $request, string $provider): Response
@@ -110,6 +114,15 @@ abstract class AbstractOAuthCallbackController
         }
         \assert($currentUser instanceof UserInterface);
 
+        // Linking signs the user in again on the cross-site path below, and it hands the account a
+        // new way in either way — so the account state is checked here as well. This path resolves
+        // the user from the state cookie rather than the session on purpose, which means "a disabled
+        // account has no session anyway" does not hold for it: the account can be disabled between
+        // initiate and callback, and self-service deletion does exactly that.
+        if (! $this->isAccountAllowedToSignIn($currentUser)) {
+            return $this->refuseAccount($request, $info, $currentUser);
+        }
+
         // The cross-site form_post callback carried no session, so the response will set a
         // brand-new session cookie (triggered by the flash writes below) that overwrites the
         // user's real one — silently signing them out. Re-establish their authenticated
@@ -147,6 +160,10 @@ abstract class AbstractOAuthCallbackController
     {
         $existing = $this->findExistingLinkUser($info);
         if ($existing !== null) {
+            if (! $this->isAccountAllowedToSignIn($existing)) {
+                return $this->refuseAccount($request, $info, $existing);
+            }
+
             $this->touchLastUsed($existing, $info);
             $this->authenticate($request, $existing);
             $this->auditLog('login_success', $info, $request, [
@@ -166,6 +183,12 @@ abstract class AbstractOAuthCallbackController
 
         $userByEmail = $this->findUserByEmail($email);
         if ($userByEmail !== null) {
+            // Refused here rather than at the end of the confirm-link challenge: there is no point
+            // emailing a code for an account that could not be signed in to anyway.
+            if (! $this->isAccountAllowedToSignIn($userByEmail)) {
+                return $this->refuseAccount($request, $info, $userByEmail);
+            }
+
             $request->getSession()->set($this->getConfirmPendingSessionKey(), [
                 'provider' => $info->getProvider(),
                 'provider_user_id' => $info->getProviderUserId(),
@@ -185,12 +208,33 @@ abstract class AbstractOAuthCallbackController
         }
 
         $newUser = $this->registerAndLink($info);
+
+        // A freshly registered account is expected to be usable, but nothing in the contract of
+        // registerAndLink() says so — checking here makes "no token is written for an account that
+        // cannot sign in" hold for every branch, rather than resting on the subclass.
+        if (! $this->isAccountAllowedToSignIn($newUser)) {
+            return $this->refuseAccount($request, $info, $newUser);
+        }
+
         $this->authenticate($request, $newUser);
         $this->auditLog('registered_and_logged_in', $info, $request, [
             $this->getAuditUserIdKey() => $newUser->getUserIdentifier(),
         ]);
 
         return new RedirectResponse($this->resolveRedirectUrl($request, $this->getFirewallName(), $this->getDashboardUrl()));
+    }
+
+    /**
+     * Returned from the intent handler, so __invoke still clears the state cookie on the way out.
+     */
+    protected function refuseAccount(Request $request, OAuthUserInfoInterface $info, UserInterface $user): Response
+    {
+        $this->auditLog('login_refused_account_state', $info, $request, [
+            $this->getAuditUserIdKey() => $user->getUserIdentifier(),
+        ]);
+        $this->addFlashMessage($request, 'error', static::ACCOUNT_REFUSED_MESSAGE);
+
+        return new RedirectResponse($this->router->generate($this->getLoginRoute()));
     }
 
     protected function authenticate(Request $request, UserInterface $user): void

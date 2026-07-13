@@ -3,6 +3,44 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `AccountStateGuardTrait` — holds the `UserCheckerInterface` and the `isAccountAllowedToSignIn()`
+  predicate that the sign-in controllers guard themselves with, plus the `ACCOUNT_REFUSED_MESSAGE`
+  key they flash when they turn a refused account away.
+- `AbstractAccountDeletionRequestController::isDeletionConfirmed(FormInterface $form, UserInterface $user): bool`
+  — the re-authentication before a deletion request is now an overridable hook. The default is the
+  previous behaviour (the current password); a subclass whose accounts have no password (created by
+  a social sign-up, for instance) overrides it with the confirmation it does have. It returns `false`
+  instead of throwing when the form carries no password field, and the failure message moved to the
+  overridable `NOT_CONFIRMED_MESSAGE` constant (was the hard-coded
+  `three_brs.account_deletion.invalid_password`).
+
+### Changed
+- The controllers that sign a user in outside the firewall now enforce the account state.
+  `AbstractMagicLinkVerifyController`, `AbstractPasskeyLoginVerifyController`,
+  `AbstractOAuthCallbackController`, `AbstractOAuthConfirmLinkController` and
+  `AbstractTwoFactorRecoveryChallengeController` each run `UserCheckerInterface::checkPreAuth()`
+  before writing the security token. They write it directly (so the second factor, which guards
+  password sign-in, is not challenged), which means the firewall's user checker never ran for them:
+  an account disabled by an administrator — or one with a self-service deletion pending — could sign
+  straight back in through a magic link, a social account, a passkey or a recovery code.
+- The refusal happens before anything is mutated: the magic link is not consumed (it still works once
+  the account is enabled again), the social-account link is not created, the recovery code is not
+  spent. Each controller answers it itself — a flash (`three_brs.account_state.sign_in_refused`) plus
+  a redirect, a `403` from the passkey verify endpoint (it answers a `fetch()`), or an
+  `AccessDeniedException` from the two-factor recovery challenge — so no `AccountStatusException`
+  escapes into the firewall.
+- Each of those five controllers gained a **last constructor argument**
+  `Symfony\Component\Security\Core\User\UserCheckerInterface $userChecker`. Bind a checker that
+  refuses on the account state alone, not the firewall's checker chain (see UPGRADE.md).
+- `PasswordPolicyFilteringValidator` no longer carries the message key of any particular framework.
+  The host application names its own redundant password-length messages in the new parameter
+  `three_brs.password_policy.redundant_message_templates` (constructor argument
+  `$redundantMessageTemplates`, empty by default); Symfony's `Length` constraint is still recognised
+  without configuration.
+
 ## [2.0.0] - 2026-07-02
 
 ### Added
@@ -77,6 +115,7 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 ## [1.0.0] - 2026-06-15
 - Initial release.
 
+[Unreleased]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/3BRS/enterprise-security-bundle/releases/tag/v1.0.0

@@ -104,7 +104,7 @@ abstract class AbstractTwoFactorSetupController
 
     /**
      * Apply the verified TOTP secret to the user entity (setTotpSecret + setTwoFactorEnabled),
-     * hash + persist the plain recovery codes via the plugin's entity manager, then flush.
+     * hash + persist the plain recovery codes via the consumer's entity manager, then flush.
      *
      * @param array<int, string> $plainCodes
      */

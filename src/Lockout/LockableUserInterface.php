@@ -7,7 +7,7 @@ namespace ThreeBRS\EnterpriseSecurityBundle\Lockout;
 /**
  * Generic lockout-state contract. Added to your `User` entity (or extended via
  * the firewall-specific `LockableAdminUserInterface` / `LockableShopUserInterface`
- * aliases for apps using the Sylius two-firewall layout).
+ * aliases for apps using a two-firewall layout).
  */
 interface LockableUserInterface
 {

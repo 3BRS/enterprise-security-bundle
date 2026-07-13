@@ -19,6 +19,8 @@ TOTP-based 2FA (Google Authenticator, Authy, 1Password, …), built on top of [`
 - Flow controllers (extend + bind): `AbstractTwoFactorSetupController`, `AbstractTwoFactorRecoveryChallengeController`, `AbstractTwoFactorDisableController`, `AbstractTwoFactorRegenerateRecoveryCodesController` — each one's abstract methods (its bind surface) are listed in [Controllers](../controllers.md#reference-abstract-controllers-and-their-bind-surface), and the extend/register/route pattern is in the [worked example](../controllers.md#example-passkey-login-verify-the-webauthn-assertion-endpoint).
 - User mixin: `TwoFactorAuthShopUserInterface` / `TwoFactorAuthAdminUserInterface` (store `totpSecret`, `twoFactorEnabled`, `trustedTokenVersion`). Your entity also implements scheb's `TwoFactorInterface` for the verification hook. Trusted devices are revoked per user by bumping `trustedTokenVersion`.
 
+- **The recovery challenge enforces the account state.** `AbstractTwoFactorRecoveryChallengeController` completes the sign-in outside the firewall, so the user checker that guards the TOTP submission never runs for it. It therefore runs the account-state checker itself (`AccountStateGuardTrait`): an account disabled while its owner sits on the challenge is refused, and its recovery code is **not** spent on the way.
+
 > **Recovery codes are a critical handoff.** After setup/regenerate, the controllers write the plaintext codes to the session and redirect to a one-shot display page **you provide** — without it the user never sees their codes. See [Controllers your app must provide §5](../controllers-you-provide.md#5-recovery-codes-one-shot-display-page-critical).
 
 ## Settings
