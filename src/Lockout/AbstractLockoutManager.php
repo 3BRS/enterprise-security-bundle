@@ -11,7 +11,7 @@ use Psr\Clock\ClockInterface;
  * lockout trigger when threshold reached, auto-unlock window evaluation,
  * post-success reset. Subclass owns persistence (pessimistic row lock,
  * flush) and the rate-limit cleanup that pairs with manual unlock — both
- * are framework-specific (Doctrine ORM, plugin's `RateLimitGuardInterface`).
+ * are framework-specific (Doctrine ORM, the consumer's `RateLimitGuardInterface`).
  */
 abstract class AbstractLockoutManager
 {
@@ -127,7 +127,7 @@ abstract class AbstractLockoutManager
     /**
      * Reset rate-limit counters keyed by this user's login identifiers, so a
      * just-unlocked user can sign in immediately without waiting out the HTTP
-     * rate-limit window. Sylius shop uses email-only; Sylius admin may use
+     * rate-limit window. A customer firewall typically uses email-only; a staff one may use
      * username + email — the subclass owns that mapping.
      */
     abstract protected function clearRateLimitForUser(LockableUserInterface $user): void;

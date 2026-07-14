@@ -11,12 +11,14 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
 use ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyAssertionVerifierInterface;
 
 abstract class AbstractPasskeyLoginVerifyController
 {
+    use AccountStateGuardTrait;
     use FirewallRedirectTrait;
 
     public function __construct(
@@ -25,7 +27,9 @@ abstract class AbstractPasskeyLoginVerifyController
         protected RouterInterface $router,
         protected LoggerInterface $logger,
         protected bool $enabled,
+        UserCheckerInterface $userChecker,
     ) {
+        $this->userChecker = $userChecker;
     }
 
     public function __invoke(Request $request): Response
@@ -61,7 +65,22 @@ abstract class AbstractPasskeyLoginVerifyController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        $this->authenticate($request, $result->getUser());
+        $user = $result->getUser();
+
+        // This endpoint answers the sign-in button's fetch(), so a refused account comes back as a
+        // status the button can act on — no flash, nothing it would have to render on another page.
+        if (! $this->isAccountAllowedToSignIn($user)) {
+            $this->logger->info($this->getLogChannel() . '.login_refused', [
+                'user_id' => $user->getUserIdentifier(),
+                'ip' => $request->getClientIp(),
+            ]);
+
+            return new JsonResponse([
+                'error' => 'Account is not allowed to sign in.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $this->authenticate($request, $user);
 
         $redirectUrl = $this->resolveRedirectUrl($request, $this->getFirewallName(), $this->getDefaultRedirectUrl());
 

@@ -13,6 +13,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
 use ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkRecordInterface;
@@ -20,6 +21,7 @@ use ThreeBRS\EnterpriseSecurityBundle\MagicLink\MagicLinkTokenVerifierInterface;
 
 abstract class AbstractMagicLinkVerifyController
 {
+    use AccountStateGuardTrait;
     use FirewallRedirectTrait;
     use FlashHelperTrait;
 
@@ -30,7 +32,9 @@ abstract class AbstractMagicLinkVerifyController
         protected ClockInterface $clock,
         protected LoggerInterface $logger,
         protected bool $enabled,
+        UserCheckerInterface $userChecker,
     ) {
+        $this->userChecker = $userChecker;
     }
 
     public function __invoke(Request $request, string $token): Response
@@ -60,6 +64,18 @@ abstract class AbstractMagicLinkVerifyController
 
         $user = $this->getUserFromMagicLink($magicLink);
 
+        // Refused before the link is consumed: an account that is only temporarily disabled must
+        // still have its unused link waiting once it is enabled again.
+        if (! $this->isAccountAllowedToSignIn($user)) {
+            $this->logger->info($this->getLogChannel() . '.verify_refused', [
+                'user_id' => $user->getUserIdentifier(),
+                'ip' => $request->getClientIp(),
+            ]);
+            $this->addFlashMessage($request, 'error', static::ACCOUNT_REFUSED_MESSAGE);
+
+            return new RedirectResponse($this->getMagicLinkRequestUrl());
+        }
+
         $magicLink->setUsedAt($this->clock->now());
         $this->commitMagicLinkUsage($magicLink);
 
@@ -81,7 +97,7 @@ abstract class AbstractMagicLinkVerifyController
 
     /**
      * Persist the "used" flag set on the magic link by the parent.
-     * Plugin subclass typically calls $entityManager->flush().
+     * A subclass typically calls $entityManager->flush().
      */
     abstract protected function commitMagicLinkUsage(MagicLinkRecordInterface $magicLink): void;
 

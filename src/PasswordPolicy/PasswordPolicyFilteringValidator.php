@@ -16,8 +16,19 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class PasswordPolicyFilteringValidator implements PasswordPolicyFilteringValidatorInterface
 {
+    /**
+     * @param list<string> $redundantMessageTemplates message templates of the host application's own
+     *                                                password-length rules, which say the same thing
+     *                                                as this bundle's policy violation and would only
+     *                                                be shown twice. Symfony's built-in Length
+     *                                                constraint is recognised without configuration;
+     *                                                anything the application words itself has to be
+     *                                                named here (bundle-agnostic: only the app knows
+     *                                                its own keys).
+     */
     public function __construct(
         protected ValidatorInterface $inner,
+        protected array $redundantMessageTemplates = [],
     ) {
     }
 
@@ -73,7 +84,7 @@ class PasswordPolicyFilteringValidator implements PasswordPolicyFilteringValidat
         foreach ($violations as $violation) {
             if (
                 (
-                    $violation->getMessageTemplate() === 'sylius.user.password.min' ||
+                    in_array($violation->getMessageTemplate(), $this->redundantMessageTemplates, true) ||
                     $violation->getCode() === Length::TOO_SHORT_ERROR
                 ) &&
                 isset($passwordPolicyPaths[$violation->getPropertyPath()])

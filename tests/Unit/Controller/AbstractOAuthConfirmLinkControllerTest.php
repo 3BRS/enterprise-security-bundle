@@ -15,6 +15,8 @@ use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Exception\DisabledException;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractOAuthConfirmLinkController;
@@ -183,6 +185,73 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
         self::assertNull($request->getSession()->get('confirm'));
     }
 
+    public function testRefusesADisabledAccountWithoutLinkingOrAuthenticating(): void
+    {
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(
+            $recorder,
+            userChecker: $this->refusingUserChecker(),
+        );
+
+        $request = $this->requestWithSession('POST', [
+            '_code' => 'valid',
+        ]);
+        $request->getSession()->set('confirm', $this->pendingData());
+
+        $response = $controller($request);
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+
+        $session = $request->getSession();
+        self::assertInstanceOf(Session::class, $session);
+        // No link is created, no token is written, and the pending link is dropped.
+        self::assertArrayNotHasKey('linkedInfo', $recorder);
+        self::assertFalse($session->has('_security_shop'));
+        self::assertNull($session->get('confirm'));
+        self::assertContains(
+            'three_brs.account_state.sign_in_refused',
+            $session->getFlashBag()->peek('error'),
+        );
+    }
+
+    public function testRefusesADisabledAccountOnGetWithoutIssuingTheChallenge(): void
+    {
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(
+            $recorder,
+            userChecker: $this->refusingUserChecker(),
+        );
+
+        $request = $this->requestWithSession();
+        $request->getSession()->set('confirm', $this->pendingData());
+
+        $response = $controller($request);
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+
+        $session = $request->getSession();
+        self::assertInstanceOf(Session::class, $session);
+        // No code is emailed for an account that could not be signed in to anyway...
+        self::assertNull($session->get('prepared'));
+        // ...nothing is linked, and the pending link is dropped.
+        self::assertArrayNotHasKey('linkedInfo', $recorder);
+        self::assertNull($session->get('confirm'));
+        self::assertContains(
+            'three_brs.account_state.sign_in_refused',
+            $session->getFlashBag()->peek('error'),
+        );
+    }
+
+    protected function refusingUserChecker(): UserCheckerInterface
+    {
+        $userChecker = $this->createStub(UserCheckerInterface::class);
+        $userChecker->method('checkPreAuth')->willThrowException(new DisabledException());
+
+        return $userChecker;
+    }
+
     /**
      * @return array{email: string, provider: string, provider_user_id: string}
      */
@@ -214,8 +283,10 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
         ?\ArrayObject $recorder = null,
         ?SocialAccountLinkRecordInterface $existingLink = null,
         bool $linkOwnedByUser = false,
+        ?UserCheckerInterface $userChecker = null,
     ): AbstractOAuthConfirmLinkController {
         $recorder ??= new \ArrayObject();
+        $userChecker ??= $this->createStub(UserCheckerInterface::class);
 
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturn('/login');
@@ -223,7 +294,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
         $twig = $this->createStub(Environment::class);
         $twig->method('render')->willReturn('<form/>');
 
-        return new class($this->createStub(TokenStorageInterface::class), $router, $twig, new NullLogger(), $recorder, $existingLink, $linkOwnedByUser) extends AbstractOAuthConfirmLinkController {
+        return new class($this->createStub(TokenStorageInterface::class), $router, $twig, new NullLogger(), $userChecker, $recorder, $existingLink, $linkOwnedByUser) extends AbstractOAuthConfirmLinkController {
             /**
              * @param \ArrayObject<string, mixed> $recorder
              */
@@ -232,11 +303,12 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
                 RouterInterface $router,
                 Environment $twig,
                 LoggerInterface $logger,
+                UserCheckerInterface $userChecker,
                 protected \ArrayObject $recorder,
                 protected ?SocialAccountLinkRecordInterface $existingLink,
                 protected bool $linkOwnedByUser,
             ) {
-                parent::__construct($tokenStorage, $router, $twig, $logger);
+                parent::__construct($tokenStorage, $router, $twig, $logger, $userChecker);
             }
 
             protected function getConfirmPendingSessionKey(): string

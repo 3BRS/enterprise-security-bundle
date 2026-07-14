@@ -12,18 +12,22 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Twig\Environment;
 
 abstract class AbstractTwoFactorRecoveryChallengeController
 {
+    use AccountStateGuardTrait;
     use FirewallRedirectTrait;
 
     public function __construct(
         protected TokenStorageInterface $tokenStorage,
         protected RouterInterface $router,
         protected Environment $twig,
+        UserCheckerInterface $userChecker,
     ) {
+        $this->userChecker = $userChecker;
     }
 
     public function __invoke(Request $request): Response
@@ -36,6 +40,16 @@ abstract class AbstractTwoFactorRecoveryChallengeController
         $user = $token->getUser();
         if (! $this->isAcceptableUser($user)) {
             throw new AccessDeniedException('Invalid user.');
+        }
+
+        // The half-authenticated two-factor token outlives the account it belongs to: the firewall
+        // re-runs the user checker on the TOTP submission, but this endpoint completes the sign-in
+        // outside it. Without this, an account disabled while its owner sits on the challenge could
+        // still be signed in with a recovery code — which would also be consumed on the way.
+        if (! $this->isAccountAllowedToSignIn($user)) {
+            $this->tokenStorage->setToken(null);
+
+            throw new AccessDeniedException('Account is not allowed to sign in.');
         }
 
         $error = null;

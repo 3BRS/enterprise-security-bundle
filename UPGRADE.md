@@ -72,3 +72,44 @@
      link-initiating user from the verified cookie on a cross-site callback.
    - Mark any provider whose callback is a cross-site `form_post` (e.g. Apple) with
      `FormPostOAuthProviderInterface`.
+
+## 2.0 → 2.1
+
+1. **The controllers that sign a user in outside the firewall now enforce the account state.** If you
+   extended `AbstractMagicLinkVerifyController`, `AbstractPasskeyLoginVerifyController`,
+   `AbstractOAuthCallbackController`, `AbstractOAuthConfirmLinkController` or
+   `AbstractTwoFactorRecoveryChallengeController`:
+   - Add `Symfony\Component\Security\Core\User\UserCheckerInterface $userChecker` as the **last
+     constructor argument** of your subclass, forward it to `parent::__construct()`, and pass it as
+     `$userChecker` in each of their service definitions in your `services.yaml`.
+   - Bind a checker that refuses on the **account state alone** — one that throws `DisabledException`
+     for an account that may not sign in, and nothing else. Do **not** pass your firewall's checker
+     chain: it must not throw `LockedException` (an account locked by failed password attempts has to
+     keep its passwordless way in, otherwise anyone can lock a victim out of their own passkey by
+     guessing their password wrong often enough) nor `CredentialsExpiredException` (an expired
+     password must not close the routes its owner needs to recover). The bundle ships no such checker
+     — "enabled" belongs to your model, not to Symfony's `UserInterface` — so write a
+     `UserCheckerInterface` over your own flag. The wiring is spelled out in
+     `docs/security-configuration.md`.
+   - Translate `three_brs.account_state.sign_in_refused` — the key the controllers flash when they
+     turn a refused account away. (The passkey verify endpoint answers `403` instead; it is consumed
+     by a `fetch()`, not rendered.)
+
+2. **Name your own redundant password-length message.** `PasswordPolicyFilteringValidator` used to
+   drop one hard-coded framework message key when the bundle's password policy had already reported
+   on the same field; it now drops only what you name in the new parameter
+   `three_brs.password_policy.redundant_message_templates` (empty by default). Add it to the
+   `parameters:` block of your `services.yaml` — without it a too-short password is reported twice,
+   once in your own wording and once by the policy. Symfony's `Length` constraint is still recognised
+   without configuration.
+
+3. **Account-deletion confirmation is now a hook, not a hard-coded password check.** If you extended
+   `AbstractAccountDeletionRequestController`:
+   - Nothing to do if your form keeps its `currentPassword` field — the default
+     `isDeletionConfirmed(FormInterface $form, UserInterface $user): bool` behaves exactly as before.
+   - If your accounts have no password to confirm with (created by a social sign-up, or with password
+     sign-in turned off), override `isDeletionConfirmed()` with the confirmation you do have instead
+     of dropping re-authentication; the default now returns `false` (rather than throwing) when the
+     form carries no password field.
+   - Override the `NOT_CONFIRMED_MESSAGE` constant if `three_brs.account_deletion.invalid_password`
+     no longer describes what failed.

@@ -49,7 +49,7 @@ abstract class AbstractTwoFactorDisableController
 
     /**
      * Clear TOTP secret, disable 2FA, bump trusted-device version, delete recovery codes,
-     * flush. Plugin subclass owns the entity manager + recovery-code repository.
+     * flush. A subclass owns the entity manager + recovery-code repository.
      */
     abstract protected function disableTwoFactorAndCommit(UserInterface $user): void;
 

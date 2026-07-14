@@ -87,7 +87,7 @@ abstract class AbstractPasskeyRegistrationVerifyController
 
     /**
      * Verify the WebAuthn registration response and persist the resulting credential.
-     * Plugin subclass typically calls a verifier service that returns an entity,
+     * A subclass typically calls a verifier service that returns an entity,
      * then $entityManager->persist + flush.
      */
     abstract protected function verifyAndPersist(UserInterface $user, string $credentialJson, string $label, string $host): void;

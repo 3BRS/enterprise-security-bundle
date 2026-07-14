@@ -1,3 +1,9 @@
+parameters:
+    # Message templates of the host application's own password-length rules — they say the same
+    # thing as this bundle's policy violation, so PasswordPolicyFilteringValidator drops them for
+    # a field the policy already reported on. Only the application knows its own keys; override.
+    three_brs.password_policy.redundant_message_templates: []
+
 services:
     _defaults:
         autowire: false
@@ -29,6 +35,10 @@ services:
     ThreeBRS\EnterpriseSecurityBundle\PasswordPolicy\PasswordPolicyFilteringValidator:
         arguments:
             $inner: '@ThreeBRS\EnterpriseSecurityBundle\PasswordPolicy\PasswordPolicyFilteringValidator.inner'
+            # The host application names its own password-length messages here, so its wording and the
+            # policy violation are not both shown for the same field. Symfony's Length constraint is
+            # recognised without configuration.
+            $redundantMessageTemplates: '%three_brs.password_policy.redundant_message_templates%'
         decorates: validator
 
     # Password history
@@ -201,7 +211,7 @@ services:
     ThreeBRS\EnterpriseSecurityBundle\Session\SessionFingerprintGeneratorInterface:
         alias: ThreeBRS\EnterpriseSecurityBundle\Session\SessionFingerprintGenerator
 
-    # Settings infrastructure (concrete provider/writer implementations live in the plugin)
+    # Settings infrastructure (concrete provider/writer implementations live in the consumer)
 
     ThreeBRS\EnterpriseSecurityBundle\Settings\Defaults\SettingsDefaultsBuilder: ~
 

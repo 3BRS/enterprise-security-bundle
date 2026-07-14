@@ -17,9 +17,9 @@ use Symfony\Component\Security\Core\User\UserInterface;
  * intentionally retained — the contract is "anonymize the user record itself",
  * not "delete every related row".
  *
- * The Sylius plugin's `CustomerAnonymizer` covers the Sylius-specific
- * `Customer` entity (buyer profile, separate from the auth identity). Non-Sylius
- * apps implement this interface against their own `User` entity.
+ * A consumer whose buyer profile lives on a separate entity from the auth
+ * identity anonymizes both. An application without such a split implements
+ * this interface against its own `User` entity.
  */
 interface UserAnonymizerInterface
 {

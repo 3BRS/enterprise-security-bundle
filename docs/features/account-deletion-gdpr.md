@@ -13,7 +13,7 @@ User-driven account deletion implementing the GDPR right to erasure, with a conf
 
 ## The flow
 
-1. **Request** (`AbstractAccountDeletionRequestController`) — the customer re-authenticates with their current password (no email round-trip) and acknowledges the consequences. Your subclass creates a request record (`requestedAt = now`, `scheduledFor = GracePeriodCalculator::calculateScheduledFor(now, graceDays)`), disables login immediately, invalidates the session, and (optionally) emails a confirmation.
+1. **Request** (`AbstractAccountDeletionRequestController`) — the customer re-authenticates with their current password (no email round-trip) and acknowledges the consequences. The re-authentication is a seam: override `isDeletionConfirmed()` when the account has no password to confirm with (a social sign-up has none) or when password sign-in is turned off, and confirm with what you do have. Your subclass creates a request record (`requestedAt = now`, `scheduledFor = GracePeriodCalculator::calculateScheduledFor(now, graceDays)`), disables login immediately, invalidates the session, and (optionally) emails a confirmation.
 2. **Cancellation** — customer self-cancellation is intentionally not exposed; only an admin can cancel, via `AbstractAccountDeletionCancelController` (+ the list controller). Cancelling re-enables the account and stamps `cancelledAt` + the acting admin for audit.
 3. **Grace expiry** — `AbstractDueDeletionsProcessor::process()` runs on a schedule and anonymizes everything past its `scheduledFor`. Send the "completed" email from `onBeforeAnonymize()` (the email is still live at that point).
 

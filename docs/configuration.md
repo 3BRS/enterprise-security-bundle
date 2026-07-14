@@ -88,6 +88,17 @@ parameters:
     # … plus Apple if used; admin variants if you have a separate admin firewall
 ```
 
+One optional parameter tunes the password policy's validator:
+
+```yaml
+parameters:
+    # Your own "password too short" message keys. The bundle's password policy already reports on the
+    # same field, so without this a too-short password is rejected twice, in two different wordings.
+    # Symfony's own Length constraint is recognised without configuration; only your keys need naming.
+    three_brs.password_policy.redundant_message_templates:
+        - 'app.user.password.min'
+```
+
 One more parameter is not read by the bundle directly but typically belongs in the same block because your wiring depends on it:
 
 - `three_brs.two_factor.issuer` — used to configure **`scheb/2fa-bundle`** (the bundle's 2FA dependency), e.g. via `prepend()` in your extension when wiring `scheb_two_factor.totp.issuer`. The bundle controllers themselves do not read it.

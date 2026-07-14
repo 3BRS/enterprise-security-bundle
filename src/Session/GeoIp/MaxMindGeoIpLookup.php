@@ -11,7 +11,7 @@ use GeoIp2\Exception\AddressNotFoundException;
  * Looks up country + city for a given IP using a local MaxMind GeoLite2 / GeoIP2
  * `.mmdb` database via `geoip2/geoip2`.
  *
- * The plugin does **not** require `geoip2/geoip2` — it's listed under composer
+ * The bundle does **not** require `geoip2/geoip2` — it's listed under composer
  * `suggest`. Wire this service up only after running
  * `composer require geoip2/geoip2` in the application and providing a path to
  * a `.mmdb` file (e.g. the free GeoLite2-City download from MaxMind).

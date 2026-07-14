@@ -69,7 +69,7 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
         // Constructor passes enabled=true / count=10 — subclass override flips
         // enabled to false at runtime, so the manage view sees recovery codes
         // as disabled even though the cached constructor value disagrees.
-        // Ensures the plugin pattern (read settings runtime via getter
+        // Ensures the consumer pattern (read settings runtime via getter
         // override) is honoured by `__invoke`.
         $captured = [];
         $controller = $this->makeController(

@@ -16,6 +16,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Exception\DisabledException;
+use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractMagicLinkVerifyController;
@@ -62,6 +64,44 @@ class AbstractMagicLinkVerifyControllerTest extends TestCase
         self::assertSame('/dashboard', $response->getTargetUrl());
     }
 
+    public function testRefusesADisabledAccountWithoutConsumingTheLink(): void
+    {
+        // The account is only disabled for now — once it is enabled again, the link must still work.
+        $magicLink = $this->createMock(MagicLinkRecordInterface::class);
+        $magicLink->expects(self::never())->method('setUsedAt');
+
+        $verifier = $this->createStub(MagicLinkTokenVerifierInterface::class);
+        $verifier->method('verify')->willReturn($magicLink);
+
+        $tokenStorage = $this->createMock(TokenStorageInterface::class);
+        $tokenStorage->method('getToken')->willReturn(null);
+        $tokenStorage->expects(self::never())->method('setToken');
+
+        $controller = $this->makeController(
+            verifier: $verifier,
+            userChecker: $this->refusingUserChecker(),
+            tokenStorage: $tokenStorage,
+        );
+
+        $request = $this->requestWithSession();
+        $response = $controller($request, 'good-token');
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/magic-link/request', $response->getTargetUrl());
+        self::assertSame(
+            ['three_brs.account_state.sign_in_refused'],
+            $request->getSession()->getFlashBag()->peek('error'),
+        );
+    }
+
+    protected function refusingUserChecker(): UserCheckerInterface
+    {
+        $userChecker = $this->createStub(UserCheckerInterface::class);
+        $userChecker->method('checkPreAuth')->willThrowException(new DisabledException());
+
+        return $userChecker;
+    }
+
     protected function requestWithSession(): Request
     {
         $request = new Request();
@@ -73,8 +113,11 @@ class AbstractMagicLinkVerifyControllerTest extends TestCase
     protected function makeController(
         bool $enabled = true,
         ?MagicLinkTokenVerifierInterface $verifier = null,
+        ?UserCheckerInterface $userChecker = null,
+        ?TokenStorageInterface $tokenStorage = null,
     ): AbstractMagicLinkVerifyController {
         $verifier ??= $this->createStub(MagicLinkTokenVerifierInterface::class);
+        $userChecker ??= $this->createStub(UserCheckerInterface::class);
 
         $clock = $this->createStub(ClockInterface::class);
         $clock->method('now')->willReturn(new \DateTimeImmutable());
@@ -82,10 +125,12 @@ class AbstractMagicLinkVerifyControllerTest extends TestCase
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturn('/dashboard');
 
-        $tokenStorage = $this->createStub(TokenStorageInterface::class);
-        $tokenStorage->method('getToken')->willReturn(null);
+        if ($tokenStorage === null) {
+            $tokenStorage = $this->createStub(TokenStorageInterface::class);
+            $tokenStorage->method('getToken')->willReturn(null);
+        }
 
-        return new class($verifier, $tokenStorage, $router, $clock, new NullLogger(), $enabled) extends AbstractMagicLinkVerifyController {
+        return new class($verifier, $tokenStorage, $router, $clock, new NullLogger(), $enabled, $userChecker) extends AbstractMagicLinkVerifyController {
             protected function isFullyAuthenticatedUser(?TokenInterface $token): bool
             {
                 return false;

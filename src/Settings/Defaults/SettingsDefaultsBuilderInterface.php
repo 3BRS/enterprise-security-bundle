@@ -9,7 +9,7 @@ interface SettingsDefaultsBuilderInterface
     /**
      * Convert processed Configuration tree into flat per-scope path map.
      *
-     * @param array<string, mixed> $processedConfig output of ProcessConfiguration on the plugin Configuration tree
+     * @param array<string, mixed> $processedConfig output of ProcessConfiguration on the application's configuration tree
      *
      * @return array<string, array<string, mixed>> scope.value => path => value
      */
