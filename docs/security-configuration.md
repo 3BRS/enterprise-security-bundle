@@ -27,7 +27,7 @@ Bind a checker that refuses on the **account state alone**. It must throw `Disab
 - not `LockedException` — an account locked by failed password attempts has to keep its passwordless way in, otherwise anyone can lock a victim out of their own passkey by guessing their password wrong often enough;
 - not `CredentialsExpiredException` — an expired password must not close the routes its owner needs to recover.
 
-The bundle ships no such checker, because "enabled" is not part of Symfony's `UserInterface` — it belongs to your model. Either reuse the one your password firewall already has, or write it:
+The bundle ships no such checker, because "enabled" is not part of Symfony's `UserInterface` — it belongs to your model. Write it over your own flag:
 
 ```php
 // src/Security/AccountStateChecker.php

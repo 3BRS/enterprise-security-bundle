@@ -17,9 +17,16 @@ use Symfony\Component\Security\Core\User\UserInterface;
  * enforced on the password form: an account disabled by an administrator, or one whose self-service
  * deletion is pending, could sign straight back in through any passwordless method.
  *
- * Bind a checker that looks at the account state alone, not the whole firewall chain: an account
- * locked by failed password attempts has to keep its passwordless way in, otherwise anyone could lock
- * a victim out of their own passkey by guessing their password wrong often enough.
+ * The bound checker must refuse on the account state alone. That is a precondition on what you bind,
+ * not an invariant held here: the refusal below catches `AccountStatusException`, the supertype of
+ * `DisabledException`, `LockedException`, `AccountExpiredException` and `CredentialsExpiredException`
+ * alike, so whatever the bound checker throws closes the passwordless routes. Bind your firewall's
+ * chain and a `LockedException` from failed password attempts would close them too — anyone could
+ * then lock a victim out of their own passkey by guessing their password wrong often enough. Bind a
+ * checker over your own "enabled" flag instead; the wiring is in docs/security-configuration.md.
+ *
+ * A checker that throws anything else is left to surface: an unrecognised refusal fails closed rather
+ * than signing the user in.
  *
  * Controllers call this before they mutate anything — a refused sign-in must not consume the magic
  * link it came in on, nor create the social-account link it was about to.

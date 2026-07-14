@@ -73,7 +73,7 @@
    - Mark any provider whose callback is a cross-site `form_post` (e.g. Apple) with
      `FormPostOAuthProviderInterface`.
 
-## 2.0 → X.Y
+## 2.0 → 2.1
 
 1. **The controllers that sign a user in outside the firewall now enforce the account state.** If you
    extended `AbstractMagicLinkVerifyController`, `AbstractPasskeyLoginVerifyController`,
@@ -88,9 +88,9 @@
      keep its passwordless way in, otherwise anyone can lock a victim out of their own passkey by
      guessing their password wrong often enough) nor `CredentialsExpiredException` (an expired
      password must not close the routes its owner needs to recover). The bundle ships no such checker
-     — "enabled" belongs to your model, not to Symfony's `UserInterface` — so reuse the one your
-     password firewall already has, or write a `UserCheckerInterface` over your own flag. The wiring
-     is spelled out in `docs/security-configuration.md`.
+     — "enabled" belongs to your model, not to Symfony's `UserInterface` — so write a
+     `UserCheckerInterface` over your own flag. The wiring is spelled out in
+     `docs/security-configuration.md`.
    - Translate `three_brs.account_state.sign_in_refused` — the key the controllers flash when they
      turn a refused account away. (The passkey verify endpoint answers `403` instead; it is consumed
      by a `fetch()`, not rendered.)

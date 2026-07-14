@@ -3,7 +3,7 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [2.1.0] - 2026-07-14
 
 ### Added
 - `AccountStateGuardTrait` — holds the `UserCheckerInterface` and the `isAccountAllowedToSignIn()`
@@ -115,7 +115,7 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 ## [1.0.0] - 2026-06-15
 - Initial release.
 
-[Unreleased]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.0.0...HEAD
+[2.1.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/3BRS/enterprise-security-bundle/releases/tag/v1.0.0

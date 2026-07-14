@@ -18,8 +18,8 @@ use Symfony\Component\Security\Core\User\UserInterface;
  * not "delete every related row".
  *
  * A consumer whose buyer profile lives on a separate entity from the auth
- * identity anonymizes both. An application without such a split
- * apps implement this interface against their own `User` entity.
+ * identity anonymizes both. An application without such a split implements
+ * this interface against its own `User` entity.
  */
 interface UserAnonymizerInterface
 {
