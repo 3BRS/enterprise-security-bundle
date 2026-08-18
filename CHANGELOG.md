@@ -3,6 +3,25 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+Documentation only — no code changes. Two entries correct statements that promised a guarantee the
+code does not give.
+
+- **`AutoRegistrationPolicy` no longer documented as requiring a verified email.** It refuses only on
+  `isEmailVerified() === false` and accepts `null`; only `GoogleOAuthProvider` sets the flag. Added
+  what each provider actually attests: Google and Apple do, Entra emits no `email_verified` and warns
+  against using `email` for authorization — its `xms_edov` claim covers this but is off by default.
+- **"Enforces revocation" reworded** in the session-management guide. The bundle only stamps
+  `revokedAt`; the sign-out listener is the integrator's. Correct further down the page, misleading
+  in the feature summary.
+- **`findExistingLinkUser()` contract stated**: resolve by `(provider, providerUserId)`, never by
+  email — that branch signs the user in with no ownership proof.
+- **Warned against Microsoft `tenant: 'common'` with auto-registration**, in the Entra setup section
+  and inline in the `configuration.md` example.
+
 ## [2.1.0] - 2026-07-14
 
 ### Added
