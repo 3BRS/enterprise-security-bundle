@@ -84,6 +84,9 @@ parameters:
     three_brs.oauth.customer.google.client_secret: '%env(GOOGLE_CLIENT_SECRET)%'
     three_brs.oauth.customer.microsoft.client_id: '%env(MICROSOFT_CLIENT_ID)%'
     three_brs.oauth.customer.microsoft.client_secret: '%env(MICROSOFT_CLIENT_SECRET)%'
+    # 'common' accepts every Entra tenant, including one an attacker registers to claim an
+    # arbitrary email. Safe on its own, but do not pair it with auto-registration — prefer your
+    # own tenant GUID. See docs/features/oauth-social-login.md#microsoft-entra-id-setup
     three_brs.oauth.customer.microsoft.tenant: 'common'
     # … plus Apple if used; admin variants if you have a separate admin firewall
 ```
