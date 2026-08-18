@@ -6,6 +6,7 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -96,7 +97,7 @@ class AbstractOAuthInitiateControllerTest extends TestCase
         // The value is HMAC-signed, not plain JSON — it must decode back to the state payload.
         $value = (string) $cookie->getValue();
         self::assertStringNotContainsString('"state"', $value);
-        $decoded = (new StateCookieSigner(self::SECRET))->decode($value);
+        $decoded = ($this->signer())->decode($value);
         self::assertIsArray($decoded);
         self::assertArrayHasKey('state', $decoded);
         self::assertSame('login', $decoded['intent']);
@@ -110,6 +111,17 @@ class AbstractOAuthInitiateControllerTest extends TestCase
         return $request;
     }
 
+    /**
+     * Fixed clock so the signed value's expiry is deterministic — the signer stamps `exp` from it.
+     */
+    protected function signer(): StateCookieSigner
+    {
+        $clock = $this->createStub(ClockInterface::class);
+        $clock->method('now')->willReturn(new \DateTimeImmutable('@1700000000'));
+
+        return new StateCookieSigner(self::SECRET, $clock);
+    }
+
     protected function makeController(
         OAuthProviderRegistryInterface $registry,
         bool $providerEnabled = true,
@@ -117,7 +129,7 @@ class AbstractOAuthInitiateControllerTest extends TestCase
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturn('https://example/callback');
 
-        return new class($registry, $router, new StateCookieSigner(self::SECRET), $providerEnabled) extends AbstractOAuthInitiateController {
+        return new class($registry, $router, $this->signer(), $providerEnabled) extends AbstractOAuthInitiateController {
             public function __construct(
                 OAuthProviderRegistryInterface $registry,
                 RouterInterface $router,

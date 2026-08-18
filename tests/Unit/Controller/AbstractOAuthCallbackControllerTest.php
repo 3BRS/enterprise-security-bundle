@@ -6,6 +6,7 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -93,7 +94,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $controller = $this->makeController(registry: $registry, existingUser: $this->stubUser());
 
         $request = $this->requestWithSession();
-        $request->cookies->set('state_apple', (new StateCookieSigner(self::SECRET))->encode([
+        $request->cookies->set('state_apple', ($this->signer())->encode([
             'state' => 'cookie-state',
             'intent' => 'login',
         ]));
@@ -131,7 +132,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         );
 
         $request = $this->requestWithSession();
-        $request->cookies->set('state_apple', (new StateCookieSigner(self::SECRET))->encode([
+        $request->cookies->set('state_apple', ($this->signer())->encode([
             'state' => 'cookie-state',
             'intent' => 'link',
             'user' => 'linker',
@@ -207,7 +208,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         );
 
         $request = $this->requestWithSession();
-        $request->cookies->set('state_apple', (new StateCookieSigner(self::SECRET))->encode([
+        $request->cookies->set('state_apple', ($this->signer())->encode([
             'state' => 'cookie-state',
             'intent' => 'link',
             'user' => 'linker',
@@ -345,6 +346,18 @@ class AbstractOAuthCallbackControllerTest extends TestCase
     }
 
     /**
+     * Fixed clock so a value encoded by the test is still within its expiry when the controller's
+     * own signer decodes it — the signer stamps `exp` from this.
+     */
+    protected function signer(): StateCookieSigner
+    {
+        $clock = $this->createStub(ClockInterface::class);
+        $clock->method('now')->willReturn(new \DateTimeImmutable('@1700000000'));
+
+        return new StateCookieSigner(self::SECRET, $clock);
+    }
+
+    /**
      * @param \ArrayObject<string, mixed>|null $recorder records the mutating hooks the controller calls
      */
     protected function makeController(
@@ -372,7 +385,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturnCallback(static fn (string $name) => '/' . str_replace('_', '-', $name));
 
-        return new class($registry, $router, $tokenStorage ?? $this->createStub(TokenStorageInterface::class), $this->createStub(Security::class), new NullLogger(), new StateCookieSigner(self::SECRET), $userChecker, $existingUser, $identifierUser, $emailUser, $recorder, $registeredUser) extends AbstractOAuthCallbackController {
+        return new class($registry, $router, $tokenStorage ?? $this->createStub(TokenStorageInterface::class), $this->createStub(Security::class), new NullLogger(), $this->signer(), $userChecker, $existingUser, $identifierUser, $emailUser, $recorder, $registeredUser) extends AbstractOAuthCallbackController {
             /**
              * @param \ArrayObject<string, mixed> $recorder
              */
