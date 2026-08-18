@@ -5,10 +5,27 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 
 ## [Unreleased]
 
-### Changed
+### Security
+- **The signed OAuth state cookie now carries its own expiry.** `StateCookieSigner` stamps an `exp`
+  into the signed body and refuses anything past it, or carrying none. Previously the only bound on
+  the value's lifetime was the cookie's `Expires` attribute — a hint to a cooperating browser, which
+  an attacker replaying a captured value simply ignores. Because a `link` cookie names the user the
+  callback signs in, any copy that outlived the browser's window (an exported HAR, a proxy or WAF
+  log, a captured request in an error report) stayed a working sign-in for that account forever,
+  unaffected by logout, a password change or "revoke all sessions".
 
-Documentation only — no code changes. Two entries correct statements that promised a guarantee the
-code does not give.
+  Exploiting this needed the value in the first place, and whoever can read a victim's cookie jar
+  can usually read their session cookie too — so this is hardening, not a break anyone was standing
+  on. It applies only to providers marked `FormPostOAuthProviderInterface` (of the bundled ones,
+  Apple) and only to `intent=link`, since `login` carries no user.
+
+### Changed
+- `StateCookieSigner::__construct()` takes `ClockInterface $clock` and `int $ttl = 600` after
+  `$secret`. `StateCookieSignerInterface` is unchanged, so consumers that only call `encode()` /
+  `decode()` need no edit — see [UPGRADE.md](UPGRADE.md#21--22) if you register the service yourself.
+  State cookies issued before the upgrade are refused, costing anyone mid-sign-in one retry.
+
+Documentation-only corrections, of statements that promised a guarantee the code does not give:
 
 - **`AutoRegistrationPolicy` no longer documented as requiring a verified email.** It refuses only on
   `isEmailVerified() === false` and accepts `null`; only `GoogleOAuthProvider` sets the flag. Added

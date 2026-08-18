@@ -143,10 +143,14 @@ services:
 
     ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthLinkCodeGenerator: ~
 
-    # OAuth state-cookie signer (HMAC) — authenticates the cross-site form_post state cookie
+    # OAuth state-cookie signer (HMAC) — authenticates the cross-site form_post state cookie and
+    # bounds its lifetime. $ttl must cover the OAuth round-trip at the provider; keep it in step
+    # with AbstractOAuthInitiateController::STATE_COOKIE_LIFETIME (the cookie's browser-side hint).
     ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSigner:
         arguments:
             $secret: '%kernel.secret%'
+            $clock: '@clock'
+            $ttl: 600
 
     # One-time code challenge (expiry + attempt limit + single-use + constant-time compare)
 
