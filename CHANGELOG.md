@@ -5,6 +5,17 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 
 ## [Unreleased]
 
+### Added
+- **`RateLimitGuard` can pair a username-keyed action with a per-address companion counter**, via the
+  new `$ipCompanionActions` map (e.g. `['login' => 'login_ip']`). This closes password spraying,
+  which the username-keyed `login` limit and the lockout counter both miss by construction: an
+  attacker spreading a few common passwords over many accounts stays under every per-account
+  threshold. Both counters are consumed before either verdict is acted on, so a tripped username
+  cannot shield the address counter; the companion is skipped when no username was passed, since the
+  primary counter is keyed on the address already. The map is **empty by default** — behaviour and
+  settings reads are unchanged until a consumer fills it in, and the companion carries its own
+  `rate_limit.{action}.*` settings so an address limit is not forced to reuse a per-account number.
+
 ### Security
 - **The signed OAuth state cookie now carries its own expiry.** `StateCookieSigner` stamps an `exp`
   into the signed body and refuses anything past it, or carrying none. Previously the only bound on
@@ -24,6 +35,15 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   `$secret`. `StateCookieSignerInterface` is unchanged, so consumers that only call `encode()` /
   `decode()` need no edit — see [UPGRADE.md](UPGRADE.md#21--22) if you register the service yourself.
   State cookies issued before the upgrade are refused, costing anyone mid-sign-in one retry.
+
+- **Documented how rate-limit counters are keyed**, and that `RateLimitGuard::buildKey()` is the
+  intended override point. The account-lockout guide now states the `trusted_proxies` prerequisite
+  as a precondition for enabling any IP-keyed action rather than a closing footnote — unconfigured,
+  every visitor reads as one address and the limiter shuts the endpoint for all of them; configured
+  too widely, `X-Forwarded-For` becomes attacker-supplied. It also warns against substituting a CDN
+  header for `getClientIp()`, and no longer claims the `login` limit slows credential stuffing:
+  keyed on the username it bounds guesses per account, exactly as the lockout counter does, and
+  spraying is built to stay under both.
 
 Documentation-only corrections, of statements that promised a guarantee the code does not give:
 
