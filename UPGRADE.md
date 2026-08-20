@@ -73,31 +73,6 @@
    - Mark any provider whose callback is a cross-site `form_post` (e.g. Apple) with
      `FormPostOAuthProviderInterface`.
 
-## 2.1 → 2.2
-
-1. **`StateCookieSigner` now bounds the lifetime of what it signs, and takes two new constructor
-   arguments.** If you register it yourself (rather than relying on the bundle's `services.yaml`),
-   add `$clock` and optionally `$ttl`:
-
-   ```yaml
-   ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSigner:
-       arguments:
-           $secret: '%kernel.secret%'
-           $clock: '@clock'   # any psr/clock implementation
-           $ttl: 600          # seconds; must cover the OAuth round-trip at the provider
-   ```
-
-   Keep `$ttl` in step with `AbstractOAuthInitiateController::STATE_COOKIE_LIFETIME`. The signer is
-   the authority — the cookie attribute is only a hint to the browser — so if the two drift, a value
-   the browser still holds may be refused and the user simply restarts the sign-in.
-
-2. **State cookies issued before the upgrade stop being accepted.** They carry no signed expiry, and
-   the check fails closed rather than granting them their previous unlimited lifetime. The practical
-   effect is that anyone *mid* Apple sign-in across the deploy gets "Invalid OAuth state parameter."
-   and clicks the button again; the window is one OAuth round-trip and nothing is lost. No action
-   required — only affects providers marked `FormPostOAuthProviderInterface` (of the bundled ones,
-   Apple).
-
 ## 2.0 → 2.1
 
 1. **The controllers that sign a user in outside the firewall now enforce the account state.** If you
@@ -138,3 +113,28 @@
      form carries no password field.
    - Override the `NOT_CONFIRMED_MESSAGE` constant if `three_brs.account_deletion.invalid_password`
      no longer describes what failed.
+
+## 2.1 → 2.2
+
+1. **`StateCookieSigner` now bounds the lifetime of what it signs, and takes two new constructor
+   arguments.** If you register it yourself (rather than relying on the bundle's `services.yaml`),
+   add `$clock` and optionally `$ttl`:
+
+   ```yaml
+   ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSigner:
+       arguments:
+           $secret: '%kernel.secret%'
+           $clock: '@clock'   # any psr/clock implementation
+           $ttl: 600          # seconds; must cover the OAuth round-trip at the provider
+   ```
+
+   Keep `$ttl` in step with `AbstractOAuthInitiateController::STATE_COOKIE_LIFETIME`. The signer is
+   the authority — the cookie attribute is only a hint to the browser — so if the two drift, a value
+   the browser still holds may be refused and the user simply restarts the sign-in.
+
+2. **State cookies issued before the upgrade stop being accepted.** They carry no signed expiry, and
+   the check fails closed rather than granting them their previous unlimited lifetime. The practical
+   effect is that anyone *mid* Apple sign-in across the deploy gets "Invalid OAuth state parameter."
+   and clicks the button again; the window is one OAuth round-trip and nothing is lost. No action
+   required — only affects providers marked `FormPostOAuthProviderInterface` (of the bundled ones,
+   Apple).

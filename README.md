@@ -132,8 +132,8 @@ The bundle is self-contained — clone it, install its own deps, and run the too
 
 ```bash
 composer install
-vendor/bin/phpunit              # 326 unit tests (services + abstract controllers)
-vendor/bin/phpstan analyse      # level max, generics + symfony extensions
+vendor/bin/phpunit              # 384 unit tests (services + abstract controllers)
+vendor/bin/phpstan analyse      # level 8 + strict rules, symfony extension
 vendor/bin/ecs check            # coding standard (--fix to apply)
 ```
 

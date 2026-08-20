@@ -17,6 +17,7 @@
         "scheb/2fa-totp": "^7.13",
         "scheb/2fa-trusted-device": "^7.13",
         "spomky-labs/otphp": "^11.4",
+        "symfony/clock": "^6.4|^7.4",
         "symfony/config": "^6.4|^7.4",
         "symfony/polyfill-mbstring": "^1.31",
         "symfony/dependency-injection": "^6.4|^7.4",

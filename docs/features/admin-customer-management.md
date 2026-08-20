@@ -9,10 +9,12 @@ The day-to-day support actions an operator needs on a user's profile — force a
 Each is a small CSRF-protected POST handler:
 
 - **Force password reset** — set `forcePasswordChange = true` on the user (`PasswordExpiration*UserInterface`). Your force-password-change listener then redirects them to the change-password page on their next request. See [Password expiration](password-expiration.md) and [Controllers your app must provide §3](../controllers-you-provide.md#3-force-password-change-ui).
-- **Block account** — set the user's `enabled` flag to `false` (your framework's user checker then rejects sign-in) **and** revoke their sessions in one step (`AbstractSessionTracker::revokeOthers()` / `revoke()`). This is **manual and indefinite** — distinct from the automatic, time-bounded [account lockout](account-lockout-rate-limiting.md) triggered by failed logins. Block = "this user is misbehaving, lock them out"; lockout = "too many wrong passwords, cool off".
+- **Block account** — set the user's `enabled` flag to `false` (your framework's user checker then rejects sign-in) **and** mark their sessions revoked (`AbstractSessionTracker::revokeOthers()` / `revoke()`), so the block covers both the next sign-in and the ones already open. This is **manual and indefinite** — distinct from the automatic, time-bounded [account lockout](account-lockout-rate-limiting.md) triggered by failed logins. Block = "this user is misbehaving, lock them out"; lockout = "too many wrong passwords, cool off".
 - **Unblock account** — set `enabled = true`; the user can sign in again immediately.
-- **Sign out from all devices** — `AbstractSessionTracker::revokeOthers()` (or revoke all). Useful after a stolen-device report or a password reset.
-- **Sign out a single session** — `AbstractSessionTracker::revoke($record)`; the row stays in history, marked ended.
+- **Mark all other devices revoked** — `AbstractSessionTracker::revokeOthers()`. Useful after a stolen-device report or a password reset.
+- **Mark a single session revoked** — `AbstractSessionTracker::revoke($record)`; the row stays in history, stamped with `revokedAt`.
+
+> **Revoking marks a session; the sign-out is your listener.** These actions stamp `revokedAt` — what turns that stamp into an actual sign-out is the `kernel.request` listener from [Controllers your app must provide §8](../controllers-you-provide.md#8-session-revocation-listener). Add it before you hand this panel to support staff, or "block" and "sign out devices" will report success while the stolen device stays signed in.
 
 ## Read-only tables
 

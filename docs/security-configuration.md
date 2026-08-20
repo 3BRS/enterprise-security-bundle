@@ -55,7 +55,7 @@ services:
             $userChecker: '@App\Security\AccountStateChecker'
 ```
 
-Translate `three_brs.account_state.sign_in_refused` — the key those controllers flash when they turn a refused account away. (The passkey verify endpoint answers `403` instead; it is consumed by a `fetch()`, not rendered.)
+Translate `three_brs.account_state.sign_in_refused` — the key flashed when a refused account is turned away. Three of the five controllers use it: `AbstractMagicLinkVerifyController`, `AbstractOAuthCallbackController` and `AbstractOAuthConfirmLinkController`. The other two answer in a shape a flash would not survive, so the key never reaches the user there and you have your own wording to supply: `AbstractPasskeyLoginVerifyController` returns `403` (it is consumed by a `fetch()`, not rendered), and `AbstractTwoFactorRecoveryChallengeController` clears the token and throws `AccessDeniedException` — style that through your error page or `access_denied_handler`.
 
 ## Two-factor authentication
 
@@ -82,7 +82,9 @@ security:
 
 Make sure your `User` entity also implements scheb's `TwoFactorInterface` from `scheb/2fa-totp` (the bundle's `TwoFactorAuthShopUserInterface` / `TwoFactorAuthAdminUserInterface` define the storage methods; scheb's interface defines the verification hook).
 
-The bundle's `TwoFactorEnforcementChecker` (+ the `TwoFactorMode` enum: `disabled` / `allowed` / `enforced`) and `TwoFactorAwareAuthenticationSuccessHandler` drive per-group enforcement on top of scheb — wire the success handler on the firewall when you want enforcement to interrupt login until 2FA is set up.
+Wire `TwoFactorAwareAuthenticationSuccessHandler` on the firewall so your own success handler cannot short-circuit scheb's challenge for a user who has 2FA enabled.
+
+To make `enforced` mode bite — holding users who have *not* enrolled at the setup step — add the listener from [Controllers your app must provide §7](controllers-you-provide.md#7-two-factor-enforcement-listener); the success handler does not cover that case, because scheb only issues a two-factor token for users who are already enrolled.
 
 ## OAuth
 

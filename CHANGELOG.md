@@ -3,7 +3,7 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [2.2.0] - 2026-08-20
 
 ### Added
 - **`RateLimitGuard` can pair a username-keyed action with a per-address companion counter**, via the
@@ -15,6 +15,12 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   primary counter is keyed on the address already. The map is **empty by default** — behaviour and
   settings reads are unchanged until a consumer fills it in, and the companion carries its own
   `rate_limit.{action}.*` settings so an address limit is not forced to reuse a per-account number.
+
+### Fixed
+- **Declared `symfony/clock`.** `services.yaml` binds the `clock` service in three places but the
+  package was never required — it only resolved because `symfony/security-bundle` happens to pull it
+  in. Now explicit, so a change upstream cannot break container compilation here.
+- PHPUnit now reports the detail of deprecations it triggers, instead of only their count.
 
 ### Security
 - **The signed OAuth state cookie now carries its own expiry.** `StateCookieSigner` stamps an `exp`
@@ -44,6 +50,21 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   header for `getClientIp()`, and no longer claims the `login` limit slows credential stuffing:
   keyed on the username it bounds guesses per account, exactly as the lockout counter does, and
   spraying is built to stay under both.
+
+- **Swept the remaining documentation for the same defect** — a claim of protection the code does not
+  implement — and corrected ten of them. The bundle is contract-first, so the recurring shape was a
+  feature summary written in bundle voice for something that is actually an abstract hook or an
+  uncalled service. Fixed: 2FA `enforced` mode (`shouldEnforceFor*()` has no caller in `src/`;
+  nothing holds an un-enrolled user at setup, and wiring the success handler does not change that),
+  magic-link timing padding (`padTo()` has no caller; the neutral response *body* is bundle
+  behaviour, the neutral response *time* is not), the admin "block account" / "sign out from all
+  devices" actions (revoking is a `revokedAt` stamp, not a sign-out), the passkey and OAuth
+  last-method guards (`canRemoveCredential()` / `canUnlinkProvider()` are abstract — the definition
+  of "last method" is the integrator's), the WebAuthn ceremony (`verifyAndPersist()` is abstract),
+  `password_expiration` (documented as readable in the `global` scope, which the checker never
+  consults), the account-state message key (three of five controllers flash it; the passkey endpoint
+  answers `403` and the recovery challenge throws), and the passkey verify request shape
+  (`{"credential": "<string>"}`, not the credential JSON raw).
 
 Documentation-only corrections, of statements that promised a guarantee the code does not give:
 
