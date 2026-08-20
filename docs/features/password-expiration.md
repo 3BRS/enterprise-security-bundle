@@ -10,7 +10,7 @@ Forces a password change after a configurable number of days, or immediately via
 
 ## Settings
 
-Read per [`SettingsScope`](../configuration.md#2-settings-store) (`customer` / `admin` / `global`):
+Read per [`SettingsScope`](../configuration.md#2-settings-store) (`customer` / `admin`):
 
 | Path | Type |
 |---|---|

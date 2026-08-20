@@ -84,3 +84,20 @@ GDPR self-service deletion is two halves: the request/cancel flow (bundle abstra
 
 - A thin **console command** (or scheduler task) that calls `DueDeletionsProcessorInterface::process()` on a cron.
 - The `UserAnonymizerInterface` impl that clears name / email / phone / address on the user.
+
+## 7. Two-factor enforcement listener
+
+`TwoFactorEnforcementChecker` answers, per user, whether the scope's mode is `enforced` and the user has not enrolled yet — `shouldEnforceForShopUser()` / `shouldEnforceForAdminUser()`. Turning that answer into pressure is yours:
+
+- An **event listener** (`kernel.request`) that redirects a user the checker flags to your 2FA setup page, from wherever they navigate. Let the setup route itself through, plus logout and your static assets, or the redirect loops.
+- **Menu / route gating** for the `disabled` mode, using `FeatureToggle::isTwoFactorActive($scope)` — the setup controllers stay reachable whatever the mode says, so hide the entry points yourself.
+
+Without the listener, `enforced` reads like a policy but behaves like `allowed`: nothing stops a user from ignoring setup indefinitely.
+
+## 8. Session revocation listener
+
+`AbstractSessionTracker::revoke()` / `revokeOthers()` stamp `revokedAt` on the session row — the "sign out my other devices" button, and the admin block/sign-out actions, both stop there. You provide:
+
+- An **event listener** (`kernel.request`) that, on each authenticated request, looks up the current session record and — if `revokedAt` is set — invalidates the PHP session, clears the security token, and redirects to login (or returns `401 {"error":"session_revoked"}` for JSON requests).
+
+Pair it with the activity-touch listener from [Session management](features/session-management-login-notifications.md#session-management) so both live in one place. Without it the revocation is a database row nobody reads: the user sees "signed out", the stolen device keeps browsing.

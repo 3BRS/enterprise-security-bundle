@@ -2,12 +2,12 @@
 
 > Feature guide for the [ThreeBRS Enterprise Security Bundle](../../README.md).
 
-Passwordless sign-in with passkeys — platform authenticators (Touch ID, Windows Hello, Android lock) or hardware security keys (YubiKey). Built on `web-auth/webauthn-lib`; the bundle performs the standard WebAuthn ceremony server-side.
+Passwordless sign-in with passkeys — platform authenticators (Touch ID, Windows Hello, Android lock) or hardware security keys (YubiKey). Built on `web-auth/webauthn-lib`. The bundle ships the WebAuthn engine parts — relying-party identity pinned from configuration, ceremony step managers, option serialization, session storage for the pending ceremony — plus the HTTP endpoints around them. **The verification step itself is a hook you implement**, because it needs your credential storage; see the primitives below.
 
 **What it does:**
-- **Register passkeys** — runs the WebAuthn registration ceremony and persists the resulting credential against the user. A user can enrol several, each with a label (e.g. "MacBook Touch ID", "YubiKey") so they can tell them apart.
-- **Passwordless login** — runs the assertion ceremony: the browser signs a challenge with a registered passkey and the bundle verifies it, then authenticates the user. No password involved.
-- **Manage credentials** — list a user's passkeys and delete them; the delete flow refuses to remove the last remaining sign-in method so nobody locks themselves out.
+- **Register passkeys** — exposes the options and verify endpoints for the registration ceremony and hands the browser's response to your `verifyAndPersist()` hook, which runs the attestation check and stores the credential. A user can enrol several, each with a label (e.g. "MacBook Touch ID", "YubiKey") so they can tell them apart.
+- **Passwordless login** — exposes the options and verify endpoints for the assertion ceremony: the browser signs a challenge with a registered passkey, your `PasskeyAssertionVerifierInterface` implementation validates it against the stored credential, and the controller authenticates the user on success. No password involved.
+- **Manage credentials** — list a user's passkeys and delete them, with a last-method guard the controller enforces through your `canRemoveCredential()` hook (see below).
 
 **Bundle primitives:**
 - `PasskeyValidatorFactory`, `PasskeyCeremonyStepManagerFactory`, `PasskeyRelyingPartyEntityFactory`, `PasskeyWebauthnSerializer`, `SessionPasskeyOptionsStorage` (+ interfaces) — the WebAuthn engine: build relying-party identity, generate/serialize options, store the pending ceremony in the session, validate assertions.
@@ -19,7 +19,7 @@ Passwordless sign-in with passkeys — platform authenticators (Touch ID, Window
 **Behaviour:**
 - **Bypasses 2FA.** `AbstractPasskeyLoginVerifyController` writes the authenticated token directly (like OAuth and magic link), so scheb's two-factor challenge is **not** triggered after a passkey sign-in. A passkey already proves possession of the registered authenticator; the second factor only guards plain password login.
 - **Enforces the account state.** Writing the token outside the firewall also skips the firewall's user checker, so the controller runs it itself (`AccountStateGuardTrait`): an account disabled by an administrator — or with a self-service deletion pending — is refused here just as it is on the password form. The refusal happens **before the token is written**, and the verify endpoint answers a `403` (it is consumed by a `fetch()`, so a redirect would be of no use to the button). Bind the account-state checker alone, not the whole firewall chain: an account locked by failed password attempts must keep its passwordless way in, or anyone could lock a victim out of their own passkey by guessing their password wrong often enough.
-- **Last-method guard.** `AbstractPasskeyDeleteController` refuses to remove a user's last remaining sign-in method.
+- **Last-method guard.** Before deleting, `AbstractPasskeyDeleteController` asks your `canRemoveCredential($user)` hook; answer `false` and it flashes `three_brs.ui.passkey.cannot_remove_last_auth_method` and leaves the credential alone. Implement it against the sign-in methods your app actually offers — another passkey, a password, a linked social account — so a user can't delete their way out of their own account.
 
 ## Front-end
 

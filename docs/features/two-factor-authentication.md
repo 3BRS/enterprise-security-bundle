@@ -2,13 +2,13 @@
 
 > Feature guide for the [ThreeBRS Enterprise Security Bundle](../../README.md).
 
-TOTP-based 2FA (Google Authenticator, Authy, 1Password, …), built on top of [`scheb/2fa-bundle`](https://github.com/scheb/2fa) (pulled in automatically). The bundle adds the enrolment flow, recovery codes, and per-scope enforcement that scheb on its own leaves to you.
+TOTP-based 2FA (Google Authenticator, Authy, 1Password, …), built on top of [`scheb/2fa-bundle`](https://github.com/scheb/2fa) (pulled in automatically). The bundle adds the enrolment flow, recovery codes, and a per-scope enforcement **policy** that scheb on its own leaves to you — the policy is a verdict you act on, not a guard the bundle installs.
 
 **What it does:**
 - **Setup wizard** — enrols a user in TOTP from a QR code (or a typed-in secret), verifying a first code before switching 2FA on.
 - **Recovery codes** — a set of single-use backup codes issued at setup for when the authenticator is lost; the user can regenerate them later, which invalidates the previous set.
 - **Trusted device** — an optional "remember this device" cookie that skips the 2FA prompt on a known device; revocable per user by bumping `trustedTokenVersion` (which invalidates their trusted-device cookies).
-- **Per-scope enforcement** — a three-state mode (`disabled` / `allowed` / `enforced`). In `enforced` mode a user who hasn't enrolled is held at the setup step until they do; `allowed` lets users opt in; `disabled` hides the feature.
+- **Per-scope enforcement policy** — a three-state mode (`disabled` / `allowed` / `enforced`) that `TwoFactorEnforcementChecker` turns into a yes/no per user. Acting on it is yours: a `kernel.request` listener holds un-enrolled users at the setup step in `enforced` mode, and your menu hides the feature when `disabled` — see [Controllers your app must provide §7](../controllers-you-provide.md#7-two-factor-enforcement-listener). Until you add them the mode is advisory and everyone can skip setup.
 - **Guards password login only.** The second factor is challenged on plain email + password sign-in; passwordless methods (OAuth, passkey, magic link) authenticate directly and bypass 2FA by design.
 
 **Bundle primitives:**

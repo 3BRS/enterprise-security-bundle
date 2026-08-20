@@ -7,7 +7,7 @@ Active-session listing with manual revocation, plus optional email notifications
 **What it does:**
 - **Records each sign-in** as a session row with the device (browser + OS), IP, approximate location (with GeoIP), and created / last-activity timestamps.
 - **Shows the user their active sessions** and marks the one they're currently on; they can **revoke a single session** or **revoke all others** in one click. The current session is left non-revocable (they sign out normally instead).
-- **Marks a session revoked** — `revoke()` / `revokeOthers()` stamp `revokedAt` on the row. Turning that stamp into an actual sign-out is a `kernel.request` listener **you write** (see *Listeners you provide* under [Session management](#session-management)) — the bundle ships none, so without it "sign out my other devices" updates the database and the revoked session keeps working. With the listener in place it takes effect on the session's very next request, without waiting for expiry.
+- **Revocation** — "sign out my other devices" marks the rows revoked; the [revocation listener](../controllers-you-provide.md#8-session-revocation-listener) you add turns that into an actual sign-out on the session's very next request, without waiting for it to expire.
 - **Login notifications** — emails the user when a sign-in comes from a device/IP they haven't used before, so an unexpected login is visible to them.
 
 ## Session management
