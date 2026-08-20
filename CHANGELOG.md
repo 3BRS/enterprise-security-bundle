@@ -3,6 +3,17 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [2.2.1] - 2026-08-20
+
+### Fixed
+- **Corrected a claim introduced in 2.2.0.** The admin guide's "block account" action said the block
+  "covers both the next sign-in and the ones already open". Only the first half is true on its own:
+  `enabled = false` stops the next sign-in, while revoking stamps `revokedAt` and closes nothing
+  until the [session revocation listener](docs/controllers-you-provide.md#8-session-revocation-listener)
+  is in place. The clause was added while rewriting 2.2.0's corrections from audit notes into
+  instructions, and reintroduced exactly the defect that release set out to remove — a summary
+  asserting an outcome the code delivers only with the integrator's help.
+
 ## [2.2.0] - 2026-08-20
 
 ### Added
