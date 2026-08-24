@@ -185,3 +185,58 @@ write the updated source and `lastUsedAt` back, and `commit()`.
 has to be atomic with the check, or two concurrent assertions replaying the same authenticator
 response both pass before either one's counter lands. That is why `commit()` is a hook rather than
 something the caller does afterwards.
+
+## Reference impl: New-device detector
+
+Same shape, smaller surface — `AbstractNewDeviceDetector` owns the check-and-remember step behind
+login notifications:
+
+```php
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use ThreeBRS\EnterpriseSecurityBundle\Session\AbstractNewDeviceDetector;
+use ThreeBRS\EnterpriseSecurityBundle\Session\KnownDeviceRecordInterface;
+
+class NewDeviceDetector extends AbstractNewDeviceDetector
+{
+    public function __construct(
+        protected UserKnownDeviceRepository $repository,
+        protected EntityManagerInterface $em,
+    ) {}
+
+    protected function isKnownDevice(UserInterface $user, string $fingerprint): bool
+    {
+        return $this->repository->existsForUser($user, $fingerprint);
+    }
+
+    protected function createRecord(UserInterface $user, string $fingerprint): KnownDeviceRecordInterface
+    {
+        $device = new UserKnownDevice();
+        $device->setUser($user);
+        $device->setFingerprint($fingerprint);
+
+        return $device;
+    }
+
+    protected function save(KnownDeviceRecordInterface $record): void
+    {
+        $this->em->persist($record);
+        $this->em->flush();
+    }
+
+    protected function discardUnflushed(KnownDeviceRecordInterface $record): void
+    {
+        $this->em->detach($record);
+    }
+
+    protected function isConcurrentInsertConflict(\Throwable $exception): bool
+    {
+        return $exception instanceof UniqueConstraintViolationException;
+    }
+}
+```
+
+`checkAndRemember($user, $fingerprint)` returns true only for a device that was not on record — and
+records it on the way out, so the second call for the same pair returns false. **Your table needs a
+unique key over (user, fingerprint)**: that constraint is what makes a concurrent sign-in from the
+same device fail its insert instead of both requests reporting a new device and emailing the user
+twice. Without it the detector still works, it just loses the race protection.

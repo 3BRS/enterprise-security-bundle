@@ -79,6 +79,7 @@ The bundle defines **record contracts** for some entities; for others it just co
 | `UserSocialAccountLink` | implements `SocialAccountLinkRecordInterface` | id, user FK, provider, providerUserId, email, linkedAt, lastUsedAt |
 | `UserDeletionRequest` | implements `CustomerDeletionRequestRecordInterface` | id, user FK, requestedAt, scheduledFor, cancelledAt, requestedByAdmin |
 | `UserPasskeyCredential` | implements `PasskeyCredentialRecordInterface` | id, user FK, credentialId, credentialSource (array), label, createdAt, lastUsedAt |
+| `UserKnownDevice` | implements `KnownDeviceRecordInterface` | id, user FK, fingerprint, createdAt — **unique key over (user, fingerprint)**, which `AbstractNewDeviceDetector` relies on to settle concurrent sign-ins |
 | `UserRecoveryCode` | *(your shape — hash via bundle's `RecoveryCodeGeneratorInterface`)* | id, user FK, codeHash, consumedAt |
 | `UserPasswordHistory` | *(optional — only if you wire `PasswordHistory` constraint into your password-change form)* | id, user FK, passwordHash, createdAt |
 
