@@ -167,3 +167,18 @@ Nothing is required — every change is backwards compatible. Two of them are wo
    — for a failed profile fetch it can quote the provider's raw response body — and the other
    failures on that path (`Invalid OAuth state parameter.`, `Missing authorization code in Google
    callback.`) told the person reading them nothing they could act on.
+
+## 2.2.2 → 2.3.0
+
+Nothing is required — the release is additive. A new abstract is available if you want to drop your
+own copy of the same logic:
+
+1. **`AbstractPasskeyAssertionVerifier`** replaces a hand-written `PasskeyAssertionVerifierInterface`
+   implementation. Extend it, pass its five collaborators to `parent::__construct()`, and implement
+   `getOptionsSessionKey()`, `resolveUser()`, `createResult()` and `commit()`. Your existing class
+   keeps working untouched — the interface is unchanged. The worked example is in
+   [Interface implementations](docs/interface-implementations.md#reference-impl-passkey-assertion-verifier).
+
+   One thing to check while switching: the flush belongs in `commit()`, i.e. inside the verifier. If
+   your controller flushed after calling `verify()`, move it — the sign-count write has to be atomic
+   with the WebAuthn check, or two concurrent assertions replaying the same response both pass.

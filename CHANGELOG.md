@@ -3,6 +3,17 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [2.3.0] - 2026-08-24
+
+### Added
+- **`AbstractPasskeyAssertionVerifier`** — the verify half of a WebAuthn assertion, which every
+  consumer wrote out by hand (the guide even shipped the ~40-line skeleton to copy). The abstract
+  runs the ceremony; the subclass supplies the options session key, the credential's owner, its
+  result DTO and the flush. The `commit()` hook exists so the sign-count write stays inside the
+  verifier: it has to be atomic with the check, or two concurrent assertions replaying the same
+  authenticator response both pass before either one's counter lands. That invariant now lives in
+  one place instead of in each copy.
+
 ## [2.2.2] - 2026-08-24
 
 ### Added

@@ -128,60 +128,60 @@ Bundle's `MagicLinkTokenGenerator` + `MagicLinkTokenValidator` are concrete — 
 
 ## Reference impl: Passkey assertion verifier
 
-Heavier example because the WebAuthn ceremony involves multiple bundle services. A complete skeleton:
+The ceremony itself lives in the bundle — extend `AbstractPasskeyAssertionVerifier` and bind the four
+things it cannot know:
 
 ```php
-use Webauthn\AuthenticatorAssertionResponse;
-use Webauthn\PublicKeyCredential;
-use Webauthn\PublicKeyCredentialRequestOptions;
-use Webauthn\PublicKeyCredentialSource;
+use ThreeBRS\EnterpriseSecurityBundle\Passkey\AbstractPasskeyAssertionVerifier;
 
-class PasskeyAssertionVerifier implements PasskeyAssertionVerifierInterface
+class PasskeyAssertionVerifier extends AbstractPasskeyAssertionVerifier implements PasskeyAssertionVerifierInterface
 {
     public function __construct(
-        protected SessionPasskeyOptionsStorageInterface $sessionStorage, // bundle
-        protected PasskeyWebauthnSerializerInterface $serializer,        // bundle
-        protected PasskeyValidatorFactoryInterface $validatorFactory,    // bundle
-        protected UserPasskeyCredentialRepository $repo,                 // your repo
-        protected EntityManagerInterface $em,                            // your EM
-        protected ClockInterface $clock,
-    ) {}
+        UserPasskeyCredentialRepository $repo,                    // your repo, typed as the bundle interface
+        SessionPasskeyOptionsStorageInterface $sessionStorage,    // bundle
+        PasskeyWebauthnSerializerInterface $serializer,           // bundle
+        PasskeyValidatorFactoryInterface $validatorFactory,       // bundle
+        ClockInterface $clock,
+        protected EntityManagerInterface $em,                     // your EM
+    ) {
+        parent::__construct($repo, $sessionStorage, $serializer, $validatorFactory, $clock);
+    }
 
-    public function verify(string $credentialResponseJson, string $host): PasskeyAssertionResultInterface
+    // The session key your options endpoint stored the ceremony under, via
+    // SessionPasskeyOptionsStorageInterface::store(). One per firewall, so a ceremony
+    // started on the shop cannot be completed on the admin.
+    protected function getOptionsSessionKey(): string
     {
-        // 1. Read + consume the pending ceremony options the options endpoint stored
-        //    (same session key the options builder wrote them under).
-        $serializedOptions = $this->sessionStorage->consume(self::ASSERTION_OPTIONS_KEY)
-            ?? throw new \RuntimeException('No passkey assertion ceremony in progress.');
+        return PasskeyAssertionOptionsBuilder::SESSION_KEY;
+    }
 
-        // 2. Deserialize the stored options and the browser's credential response.
-        $options    = $this->serializer->deserialize($serializedOptions, PublicKeyCredentialRequestOptions::class);
-        $credential = $this->serializer->deserialize($credentialResponseJson, PublicKeyCredential::class);
+    // Your credential entity's owner accessor — `PasskeyCredentialRecordInterface` covers
+    // credential data only (id, source, label, timestamps), not the user association.
+    protected function resolveUser(PasskeyCredentialRecordInterface $credential): UserInterface
+    {
+        return $credential->getUser();
+    }
 
-        $response = $credential->response;
-        if (!$response instanceof AuthenticatorAssertionResponse) {
-            throw new \RuntimeException('Expected an assertion response from the client.');
-        }
+    // A small DTO of yours implementing PasskeyAssertionResultInterface (`getUser()`).
+    protected function createResult(UserInterface $user): PasskeyAssertionResultInterface
+    {
+        return new PasskeyAssertionResult($user);
+    }
 
-        // 3. Look up the stored credential by its raw id; rebuild its source object.
-        $stored = $this->repo->findOneByCredentialId($credential->rawId)
-            ?? throw new \RuntimeException('Unknown credential.');
-        $source = $this->serializer->denormalize($stored->getCredentialSource(), PublicKeyCredentialSource::class);
-
-        // 4. Run the WebAuthn assertion check (signature, RP id, sign-count, …); returns the updated source.
-        $updatedSource = $this->validatorFactory->createAssertionValidator()->check(
-            $source, $response, $options, $host, $source->userHandle,
-        );
-
-        // 5. Persist the bumped sign-count + lastUsedAt — flush here, atomic with the check,
-        //    to close the replay window between concurrent assertions.
-        $stored->setCredentialSource($this->serializer->normalize($updatedSource));
-        $stored->setLastUsedAt($this->clock->now());
+    protected function commit(): void
+    {
         $this->em->flush();
-
-        return new PasskeyAssertionResult($stored->getUser());
     }
 }
 ```
 
-`PasskeyAssertionResult` is a small DTO you write implementing `PasskeyAssertionResultInterface` (`getUser()`). `ASSERTION_OPTIONS_KEY` is the session key your options endpoint stored the ceremony under via `SessionPasskeyOptionsStorageInterface::store()`. `$stored->getUser()` is your credential entity's owner accessor — the bundle's `PasskeyCredentialRecordInterface` covers credential data only (id, source, label, timestamps), not the user association, so expose the owner on your own entity.
+What the abstract runs, in order: consume the pending ceremony options (absent ⇒ refuse), deserialize
+them and the browser's credential response, refuse anything that is not an
+`AuthenticatorAssertionResponse`, look the stored credential up by its raw id (unknown ⇒ refuse),
+rebuild its `PublicKeyCredentialSource`, run the WebAuthn check (signature, RP id, sign-count, …),
+write the updated source and `lastUsedAt` back, and `commit()`.
+
+**The commit belongs inside the verifier, not in your controller.** Persisting the bumped sign-count
+has to be atomic with the check, or two concurrent assertions replaying the same authenticator
+response both pass before either one's counter lands. That is why `commit()` is a hook rather than
+something the caller does afterwards.
