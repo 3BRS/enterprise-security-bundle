@@ -74,7 +74,15 @@ abstract class AbstractOAuthCallbackController
         try {
             $info = $oauthProvider->fetchUserInfo($request, $redirectUri, $expectedState, $this->getOAuthGroup());
         } catch (OAuthProviderException $exception) {
-            $this->addFlashMessage($request, 'error', $exception->getMessage());
+            // The exception message is developer-facing and can carry the provider's raw response
+            // body (see GoogleOAuthProvider::fetchUserInfo()), so it goes to the log, not to the
+            // user — who gets the same kind of translation key as every other flash here.
+            $this->logger->warning(sprintf('%s.provider_error', $this->getAuditChannel()), [
+                'provider' => $provider,
+                'ip' => $request->getClientIp(),
+                'exception' => $exception,
+            ]);
+            $this->addFlashMessage($request, 'error', 'three_brs.ui.social_login.provider_error');
 
             return $this->withClearedStateCookie(
                 new RedirectResponse($this->router->generate($this->getLoginRoute())),

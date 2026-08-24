@@ -42,6 +42,8 @@ Sign in (and optionally auto-register) with **Google, Apple and Microsoft** — 
 
 Outcome 1 is keyed on the **identity**, outcomes 2 and 3 on the email. Implement `findExistingLinkUser($info)` accordingly: look the link up by the `(getProvider(), getProviderUserId())` pair — the provider's immutable subject id, which is what `getProviderUserId()` returns — and never by `getEmail()`. Outcome 1 signs the user straight in, so keying it on the email would let a forged claim skip the outcome-2 ownership challenge entirely.
 
+When the identity cannot be fetched at all — the `state` did not match, no authorization code came back, the token exchange or the profile call failed — `AbstractOAuthCallbackController` logs the exception (at `warning`, under `{your audit channel}.provider_error`, with the exception attached) and sends the user back to the login route with the `three_brs.ui.social_login.provider_error` flash. The exception message stays in the log on purpose: it is developer-facing and can quote the provider's raw response body.
+
 The unlink action carries a last-method guard: `AbstractSocialAccountUnlinkController` asks your `canUnlinkProvider($user, $provider)` hook first and, on `false`, flashes `three_brs.ui.social_login.cannot_unlink_last_method` and keeps the link. Implement it against the sign-in methods your app offers — a password, a passkey, another provider — so a user can't unlink themselves out of their own account.
 
 ## Settings

@@ -138,3 +138,18 @@
    and clicks the button again; the window is one OAuth round-trip and nothing is lost. No action
    required — only affects providers marked `FormPostOAuthProviderInterface` (of the bundled ones,
    Apple).
+
+## 2.2 → 2.2.2
+
+Nothing is required — the change is backwards compatible, but it is worth a look:
+
+1. **`AbstractOAuthCallbackController` flashes a translation key when the provider call fails**,
+   instead of the exception's message. If you render OAuth flashes without translating them, define
+   `three_brs.ui.social_login.provider_error` in the domain you render flashes in — otherwise the
+   user now sees the raw key.
+
+   The detail is not lost: it goes to the logger at `warning` under
+   `{your audit channel}.provider_error`, with the exception attached. It was developer-facing text
+   — for a failed profile fetch it can quote the provider's raw response body — and the other
+   failures on that path (`Invalid OAuth state parameter.`, `Missing authorization code in Google
+   callback.`) told the person reading them nothing they could act on.

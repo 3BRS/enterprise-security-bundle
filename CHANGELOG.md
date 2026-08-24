@@ -15,6 +15,15 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   HTTP 500 with no way out through the UI. It now falls back to `DISABLED`: an unrecognised value
   must neither switch a second factor on by itself nor quietly stop enforcing one.
 
+### Changed
+- **A failed OAuth provider call flashes `three_brs.ui.social_login.provider_error`** instead of the
+  exception's message. Every other flash in `AbstractOAuthCallbackController` is a translation key;
+  this one handed the user developer-facing English that, for a failed profile fetch, could include
+  the provider's raw response body. The message now goes to the logger at `warning` under
+  `{audit channel}.provider_error` with the exception attached, so nothing is lost for diagnosis.
+  Consumers that render OAuth flashes untranslated need the new key — see
+  [UPGRADE.md](UPGRADE.md#22--222).
+
 ## [2.2.1] - 2026-08-20
 
 ### Fixed
