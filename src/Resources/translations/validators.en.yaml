@@ -1,0 +1,22 @@
+# Default English wording for the constraint messages this bundle's constraints carry.
+# Symfony renders constraint violations through the `validators` domain, so these apply as soon as
+# the bundle is registered. Override any of them from your app's `translations/` directory (which
+# is loaded after every bundle), or from a bundle registered after this one, and add the other
+# locales you serve. See docs/templates-and-translations.md.
+three_brs:
+    password_policy:
+        # `{{ limit }}` is set by the PasswordPolicyValidatorInterface implementation you provide —
+        # if yours does not set it, the placeholder is rendered as-is.
+        min_length: 'Password must be at least {{ limit }} characters long.'
+        max_length: 'Password must not exceed {{ limit }} characters.'
+        require_uppercase: 'Password must contain at least one uppercase letter.'
+        require_lowercase: 'Password must contain at least one lowercase letter.'
+        require_numbers: 'Password must contain at least one number.'
+        require_special_characters: 'Password must contain at least one special character.'
+    password_history:
+        reused: 'This password has been used recently. Please choose a different password.'
+    ip_whitelist:
+        invalid_cidr: '"{{ value }}" is not a valid IP address or CIDR range.'
+        duplicate_cidr: '"{{ value }}" is listed more than once.'
+    two_factor:
+        invalid_code: 'The authentication code is invalid. Please try again.'

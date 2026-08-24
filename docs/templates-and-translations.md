@@ -34,7 +34,15 @@ Each has a matching interface (`*Interface`) so you can decorate or replace it.
 
 ## Translation domains
 
-The bundle ships **no translation catalogues** — any key you leave undefined renders as its raw message id (the `three_brs.*` string) to the end user, so define the ones your UI surfaces. The complete set the bundle emits is below; the authoritative source is the message literals in `src/` (`grep -rho "three_brs\." src/`).
+The bundle ships **English catalogues** for every message id it emits, in `src/Resources/translations/`: `validators.en.yaml`, `flashes.en.yaml`, `messages.en.yaml`. Symfony registers a bundle's translation directory on its own, so with `symfony/translation` installed (plus `symfony/yaml`, for the YAML loader) they apply as soon as the bundle is registered — nothing surfaces as a raw `three_brs.*` id out of the box. A unit test keeps the catalogues and the ids in `src/` in step, in both directions.
+
+They are defaults, not fixtures:
+
+- **Override any id** from your app's `translations/` directory — it is loaded after every bundle, so it always wins.
+- A **bundle registered after this one** in `config/bundles.php` also overrides it. That is how `3brs/sylius-enterprise-security-plugin` supplies its own wording; if you register a plugin *before* this bundle, the bundle's default wins instead.
+- **Other locales are yours** — the bundle ships `en` only. Add `flashes.cs.yaml`, `validators.de.yaml`, … in your app for the rest.
+
+The tables below are the full set; the authoritative source is the message literals in `src/` (`grep -rho "three_brs\." src/`).
 
 ### Validator messages (`validators` domain)
 
@@ -47,13 +55,16 @@ Raised as constraint violations / form errors and rendered by the Symfony valida
 | Admin IP list (CIDR) | `three_brs.ip_whitelist.invalid_cidr`, `three_brs.ip_whitelist.duplicate_cidr` |
 | Two-factor (setup code) | `three_brs.two_factor.invalid_code` |
 
+The shipped `min_length` / `max_length` wording interpolates `{{ limit }}`, which the `PasswordPolicyValidatorInterface` implementation *you* provide has to set on the violation (`->setParameter('{{ limit }}', …)`); the CIDR keys interpolate `{{ value }}`, which the bundle's own validator sets.
+
 ### Flash messages
 
-Added to the session flash bag as raw keys (the bundle does not pick a domain — translate them when you render flashes, conventionally a `flashes` catalogue):
+Added to the session flash bag as raw keys — the bundle does not pick a domain, so the shipped `flashes.en.yaml` assumes the conventional one (`{{ message|trans({}, 'flashes') }}`). Render them in another domain and you need the catalogue there instead:
 
 | Group | Keys |
 |---|---|
 | Account deletion | `three_brs.account_deletion.`{`requested`, `cancelled`, `invalid_password`} |
+| Account state (sign-in refused) | `three_brs.account_state.sign_in_refused` |
 | Lockout (admin unlock) | `three_brs.lockout.unlocked`, `three_brs.lockout.already_unlocked` |
 | Sessions | `three_brs.session.`{`revoked`, `others_revoked`, `cannot_revoke_current`} |
 | Two-factor | `three_brs.two_factor.disabled` |
@@ -65,7 +76,7 @@ Added to the session flash bag as raw keys (the bundle does not pick a domain �
 
 ### Surfaced elsewhere
 
-- `three_brs.rate_limit.too_many_requests` — the message on the `TooManyRequestsHttpException` (HTTP 429) thrown by `RateLimitGuard`; translate it where you catch/render the exception.
-- `three_brs.ui.two_factor.recovery_code_required`, `three_brs.ui.two_factor.invalid_recovery_code` — passed to the recovery-challenge template as its `error` variable (you translate them in the template).
+- `three_brs.rate_limit.too_many_requests` (shipped in `flashes.en.yaml`) — the message on the `TooManyRequestsHttpException` (HTTP 429) thrown by `RateLimitGuard`; render it where you catch the exception.
+- `three_brs.ui.two_factor.recovery_code_required`, `three_brs.ui.two_factor.invalid_recovery_code` (shipped in `messages.en.yaml`) — passed to the recovery-challenge template as its `error` variable, so `{{ error|trans }}` in the default domain resolves them.
 
 > Concrete validators / flows you write yourself may add their own keys — e.g. a password-history validator that also rejects a password too similar to the current one would emit something like `three_brs.password_history.similar_to_current`, which is yours to define, not the bundle's.

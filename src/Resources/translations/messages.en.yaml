@@ -1,0 +1,9 @@
+# Default English wording for the message ids the bundle hands to a template rather than to the
+# flash bag or the validator — you render them with `{{ error|trans }}`, i.e. in the default
+# `messages` domain. Override in your app's `translations/` directory and add the other locales you
+# serve. See docs/templates-and-translations.md.
+three_brs:
+    ui:
+        two_factor:
+            recovery_code_required: 'Please enter a recovery code.'
+            invalid_recovery_code: 'This recovery code is invalid or already used.'
