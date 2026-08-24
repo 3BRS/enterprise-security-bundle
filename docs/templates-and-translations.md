@@ -59,7 +59,9 @@ Added to the session flash bag as raw keys (the bundle does not pick a domain â€
 | Two-factor | `three_brs.two_factor.disabled` |
 | Magic link | `three_brs.ui.magic_link.`{`request_sent`, `invalid_or_expired`} |
 | Passkey | `three_brs.ui.passkey.`{`removed`, `cannot_remove_last_auth_method`} |
-| Social login | `three_brs.ui.social_login.`{`linked`, `unlinked`, `already_linked`, `already_linked_other_account`, `auto_register_refused`, `cannot_unlink_last_method`, `missing_email`, `not_logged_in`} |
+| Social login | `three_brs.ui.social_login.`{`linked`, `unlinked`, `already_linked`, `already_linked_other_account`, `auto_register_refused`, `cannot_unlink_last_method`, `missing_email`, `not_logged_in`, `provider_error`} |
+
+`three_brs.ui.social_login.provider_error` covers **any** `OAuthProviderException` raised while fetching the identity on the callback â€” a failed token exchange, a rejected `state`, a missing authorization code, an unreadable profile response. The exception's own message is developer-facing (it can quote the provider's response body), so it goes to the logger at `warning` under `{audit channel}.provider_error` and the user sees this key.
 
 ### Surfaced elsewhere
 

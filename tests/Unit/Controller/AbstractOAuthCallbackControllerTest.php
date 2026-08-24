@@ -7,10 +7,12 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Routing\RouterInterface;
@@ -75,6 +77,47 @@ class AbstractOAuthCallbackControllerTest extends TestCase
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertSame('/login', $response->getTargetUrl());
+    }
+
+    public function testFetchFailureFlashesATranslationKeyAndLogsTheProviderDetail(): void
+    {
+        // The exception message is developer-facing and may quote the provider's response body,
+        // so the user gets a translation key like every other flash here and the detail is kept
+        // for the log.
+        $exception = new OAuthProviderException('Failed to fetch Google user info: 401 {"error":"invalid_token"}');
+
+        $provider = $this->createStub(OAuthProviderInterface::class);
+        $provider->method('fetchUserInfo')->willThrowException($exception);
+
+        $registry = $this->createStub(OAuthProviderRegistryInterface::class);
+        $registry->method('has')->willReturn(true);
+        $registry->method('get')->willReturn($provider);
+
+        $loggedMessage = null;
+        $loggedContext = [];
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->willReturnCallback(static function (string $message, array $context) use (&$loggedMessage, &$loggedContext): void {
+                $loggedMessage = $message;
+                $loggedContext = $context;
+            });
+
+        $controller = $this->makeController(registry: $registry, logger: $logger);
+
+        $request = $this->requestWithSession();
+        $controller($request, 'google');
+
+        $session = $request->getSession();
+        self::assertInstanceOf(FlashBagAwareSessionInterface::class, $session);
+        self::assertSame(
+            ['three_brs.ui.social_login.provider_error'],
+            $session->getFlashBag()->peek('error'),
+        );
+
+        self::assertSame('test.oauth.provider_error', $loggedMessage);
+        self::assertSame('google', $loggedContext['provider']);
+        self::assertSame($exception, $loggedContext['exception']);
     }
 
     public function testReadsStateFromCookieAndClearsItForFormPostProvider(): void
@@ -369,9 +412,11 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         ?UserInterface $emailUser = null,
         ?\ArrayObject $recorder = null,
         ?UserInterface $registeredUser = null,
+        ?LoggerInterface $logger = null,
     ): AbstractOAuthCallbackController {
         $userChecker ??= $this->createStub(UserCheckerInterface::class);
         $recorder ??= new \ArrayObject();
+        $logger ??= new NullLogger();
 
         if ($registry === null) {
             $provider = $this->createStub(OAuthProviderInterface::class);
@@ -385,7 +430,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturnCallback(static fn (string $name) => '/' . str_replace('_', '-', $name));
 
-        return new class($registry, $router, $tokenStorage ?? $this->createStub(TokenStorageInterface::class), $this->createStub(Security::class), new NullLogger(), $this->signer(), $userChecker, $existingUser, $identifierUser, $emailUser, $recorder, $registeredUser) extends AbstractOAuthCallbackController {
+        return new class($registry, $router, $tokenStorage ?? $this->createStub(TokenStorageInterface::class), $this->createStub(Security::class), $logger, $this->signer(), $userChecker, $existingUser, $identifierUser, $emailUser, $recorder, $registeredUser) extends AbstractOAuthCallbackController {
             /**
              * @param \ArrayObject<string, mixed> $recorder
              */
@@ -394,7 +439,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
                 RouterInterface $router,
                 TokenStorageInterface $tokenStorage,
                 Security $security,
-                NullLogger $logger,
+                LoggerInterface $logger,
                 StateCookieSignerInterface $stateCookieSigner,
                 UserCheckerInterface $userChecker,
                 protected ?UserInterface $existingUser,
