@@ -82,7 +82,7 @@ abstract class AbstractTwoFactorSetupController
         }
 
         $username = $this->getUsernameForProvisioning($user);
-        $uri = $this->totpGenerator->buildProvisioningUri($secret, $username, $this->issuer);
+        $uri = $this->totpGenerator->buildProvisioningUri($secret, $username, $this->getIssuer());
 
         return new Response($this->twig->render($this->getSetupTemplate(), [
             'form' => $form->createView(),
@@ -138,5 +138,14 @@ abstract class AbstractTwoFactorSetupController
     protected function getRecoveryCodesCount(): int
     {
         return $this->recoveryCodesCount;
+    }
+
+    /**
+     * Subclass may override to read the issuer at runtime — e.g. per tenant, per brand, or from
+     * DB-backed settings — rather than the constructor parameter passed at compile time.
+     */
+    protected function getIssuer(): string
+    {
+        return $this->issuer;
     }
 }
