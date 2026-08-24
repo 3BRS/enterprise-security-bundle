@@ -27,7 +27,12 @@ Active-session listing with manual revocation, plus optional email notifications
 
 On a successful sign-in, compute a device fingerprint with `SessionFingerprintGenerator::generate($userAgent, $ipAddress)` — `sha256(userAgent + '|' + ipAddress)`. If that fingerprint isn't already stored for the user, persist it and send a notification email (time, parsed browser/OS, IP, and country/city when a GeoIP provider is wired). Subsequent logins from the same UA + IP are a known device and send no email.
 
-The bundle ships the fingerprint generator; the known-device store and the mailer are yours (the bundle has no mail-transport coupling).
+**Bundle primitives:**
+- `SessionFingerprintGenerator` (`SessionFingerprintGeneratorInterface`) — the fingerprint itself.
+- `AbstractNewDeviceDetector` — extend it. `checkAndRemember($user, $fingerprint)` answers "is this device new?" and remembers it in one step, which is the point: two concurrent sign-ins from the same device must not both read "unknown" and both send the mail. The insert race is settled by the unique key on your `(user, fingerprint)` columns — the subclass says which exception means "conflict" (`isConcurrentInsertConflict`), the abstract turns that into "already known". Other hooks bind the lookup, the record factory and Doctrine persistence (`isKnownDevice`, `createRecord`, `save`, `discardUnflushed`).
+- `KnownDeviceRecordInterface` — the persisted row you implement, plus your own user accessors. See [Entities & persistence](../entities-and-persistence.md).
+
+The mailer stays yours — the bundle has no mail-transport coupling.
 
 > **First-time enable.** The known-device store is empty when you first turn `login_notifications` on, so every active user gets a notification at their next sign-in (every device is "new" until stored). To suppress the initial wave, pre-populate trusted `(user, fingerprint)` pairs before enabling.
 

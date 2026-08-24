@@ -13,6 +13,12 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   verifier: it has to be atomic with the check, or two concurrent assertions replaying the same
   authenticator response both pass before either one's counter lands. That invariant now lives in
   one place instead of in each copy.
+- **`AbstractNewDeviceDetector`** and **`KnownDeviceRecordInterface`** — the check-and-remember step
+  behind login notifications, together in one call because the two halves must not be separable: two
+  concurrent sign-ins from the same device would both read "unknown" and both email the user. The
+  insert race is settled by the unique key on the consumer's `(user, fingerprint)` columns, with the
+  subclass naming the exception that means conflict — the same shape `AbstractSessionTracker`
+  already uses, so no Doctrine dependency enters the bundle.
 
 ## [2.2.2] - 2026-08-24
 

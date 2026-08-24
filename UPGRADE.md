@@ -170,8 +170,8 @@ Nothing is required — every change is backwards compatible. Two of them are wo
 
 ## 2.2.2 → 2.3.0
 
-Nothing is required — the release is additive. A new abstract is available if you want to drop your
-own copy of the same logic:
+Nothing is required — the release is additive. Two new abstracts are available if you want to drop
+your own copies of the same logic:
 
 1. **`AbstractPasskeyAssertionVerifier`** replaces a hand-written `PasskeyAssertionVerifierInterface`
    implementation. Extend it, pass its five collaborators to `parent::__construct()`, and implement
@@ -182,3 +182,10 @@ own copy of the same logic:
    One thing to check while switching: the flush belongs in `commit()`, i.e. inside the verifier. If
    your controller flushed after calling `verify()`, move it — the sign-count write has to be atomic
    with the WebAuthn check, or two concurrent assertions replaying the same response both pass.
+
+2. **`AbstractNewDeviceDetector`** replaces the "is this device new?" service behind login
+   notifications, and `KnownDeviceRecordInterface` types the row it writes. Your known-device table
+   wants a **unique key over (user, fingerprint)** — the abstract settles a concurrent sign-in by
+   catching the insert conflict (`isConcurrentInsertConflict()`), which is what keeps a user from
+   getting two "new device" mails for one sign-in. Without the constraint it still works, it just
+   loses that protection.
