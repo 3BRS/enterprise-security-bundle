@@ -3,6 +3,18 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [2.2.2] - 2026-08-24
+
+### Fixed
+- **An unknown `two_factor_authentication.mode` no longer takes the whole application down.**
+  `PolicyFactory::twoFactorMode()` called `TwoFactorMode::from()` on a value read from a settings
+  store the bundle does not own, so anything outside `disabled` / `allowed` / `enforced` — a direct
+  SQL write, a data migration, a restore from an older database, a consumer filling settings from
+  its own code — threw a `\ValueError`. The mode is read on every request of a signed-in user,
+  including the settings page where the value could have been corrected, so one bad row meant an
+  HTTP 500 with no way out through the UI. It now falls back to `DISABLED`: an unrecognised value
+  must neither switch a second factor on by itself nor quietly stop enforcing one.
+
 ## [2.2.1] - 2026-08-20
 
 ### Fixed

@@ -64,4 +64,36 @@ class PolicyFactoryTest extends TestCase
 
         self::assertSame(TwoFactorMode::ENFORCED, $mode);
     }
+
+    /**
+     * Every value the enum knows must come back as itself — otherwise the fallback below would be
+     * swallowing a valid setting rather than only catching a broken one.
+     */
+    public function testTwoFactorModeReturnsEnumForEveryValidValue(): void
+    {
+        foreach (TwoFactorMode::cases() as $case) {
+            $provider = $this->createStub(SettingsProviderInterface::class);
+            $provider->method('getString')->willReturn($case->value);
+
+            $factory = new PolicyFactory($provider);
+
+            self::assertSame($case, $factory->twoFactorMode(SettingsScope::ADMIN));
+        }
+    }
+
+    /**
+     * The stored value is outside the bundle's control, and the mode is read on every request of a
+     * signed-in user — a value the enum does not know must not turn that into an HTTP 500.
+     */
+    public function testTwoFactorModeFallsBackToDisabledForUnknownValue(): void
+    {
+        foreach (['nonsense', '', 'ENFORCED', '1'] as $stored) {
+            $provider = $this->createStub(SettingsProviderInterface::class);
+            $provider->method('getString')->willReturn($stored);
+
+            $factory = new PolicyFactory($provider);
+
+            self::assertSame(TwoFactorMode::DISABLED, $factory->twoFactorMode(SettingsScope::CUSTOMER));
+        }
+    }
 }
