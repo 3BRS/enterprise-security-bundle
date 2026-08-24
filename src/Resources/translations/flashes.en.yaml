@@ -1,0 +1,44 @@
+# Default English wording for the messages this bundle's controllers put in the flash bag, plus the
+# message on the HTTP 429 exception RateLimitGuard throws.
+#
+# The bundle adds flashes as raw message ids and does not pick a domain — this catalogue assumes
+# the conventional `flashes` one, i.e. that your template renders them with
+# `{{ message|trans({}, 'flashes') }}`. Translate them in whichever domain you actually render, and
+# add the other locales you serve. Overriding: your app's `translations/` directory is loaded after
+# every bundle, and a bundle registered after this one also wins.
+# See docs/templates-and-translations.md.
+three_brs:
+    account_deletion:
+        requested: 'Your account has been scheduled for deletion. Sign-in is now disabled.'
+        cancelled: 'Account deletion cancelled. The account can sign in again.'
+        invalid_password: 'The password you entered is incorrect.'
+    account_state:
+        sign_in_refused: 'This account is disabled and cannot be used to sign in.'
+    lockout:
+        unlocked: 'Account has been unlocked.'
+        already_unlocked: 'Account is no longer locked — nothing to do.'
+    rate_limit:
+        too_many_requests: 'Too many requests. Please wait a moment and try again.'
+    session:
+        revoked: 'Session signed out.'
+        others_revoked: 'All other sessions have been signed out.'
+        cannot_revoke_current: 'You cannot sign out the current session this way. Use the sign-out link instead.'
+    two_factor:
+        disabled: 'Two-factor authentication has been disabled.'
+    ui:
+        magic_link:
+            request_sent: 'If an account exists for the email you entered, a sign-in link has been sent.'
+            invalid_or_expired: 'This magic link is invalid or has expired. Request a new one to sign in.'
+        passkey:
+            removed: 'Passkey removed.'
+            cannot_remove_last_auth_method: 'You cannot remove the last sign-in method on your account. Set a password or add another passkey first.'
+        social_login:
+            linked: '3rd-party account linked.'
+            unlinked: '3rd-party account unlinked.'
+            already_linked: 'This 3rd-party account is already linked to your account.'
+            already_linked_other_account: 'This 3rd-party account is linked to a different user.'
+            auto_register_refused: 'Self-registration through this 3rd-party provider is not allowed. Please contact an administrator.'
+            cannot_unlink_last_method: 'Cannot unlink the last remaining sign-in method. Set a password first or keep at least one other 3rd-party link.'
+            missing_email: 'The provider did not share an email address, cannot continue.'
+            not_logged_in: 'You must be logged in to link a 3rd-party account.'
+            provider_error: 'Signing in with this provider failed. Please try again, or use another sign-in method.'

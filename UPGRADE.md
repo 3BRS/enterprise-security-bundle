@@ -141,12 +141,26 @@
 
 ## 2.2 → 2.2.2
 
-Nothing is required — the change is backwards compatible, but it is worth a look:
+Nothing is required — every change is backwards compatible. Two of them are worth a look:
 
-1. **`AbstractOAuthCallbackController` flashes a translation key when the provider call fails**,
+1. **The bundle now ships English translation catalogues**
+   (`src/Resources/translations/{validators,flashes,messages}.en.yaml`) covering every message id it
+   emits. Symfony picks up a bundle's translation directory on its own, so ids you had left
+   undefined — which rendered as the raw `three_brs.*` string — now read as English sentences.
+
+   Your own wording still wins: the app's `translations/` directory is loaded after every bundle,
+   and so is any bundle registered after this one in `config/bundles.php` (where
+   `3brs/sylius-enterprise-security-plugin` sits). Only English ships; add the other locales you
+   serve. The catalogues assume the `flashes` domain for flash ids and the default `messages`
+   domain for the two recovery-challenge ids handed to your template — see
+   [Templates & translations](docs/templates-and-translations.md#translation-domains) if you render
+   them elsewhere. Loading them needs `symfony/translation` plus `symfony/yaml` (its YAML loader),
+   both already present in a full-stack Symfony app; without them the files are simply inert.
+
+2. **`AbstractOAuthCallbackController` flashes a translation key when the provider call fails**,
    instead of the exception's message. If you render OAuth flashes without translating them, define
-   `three_brs.ui.social_login.provider_error` in the domain you render flashes in — otherwise the
-   user now sees the raw key.
+   `three_brs.ui.social_login.provider_error` in the domain you render flashes in (the shipped
+   `flashes.en.yaml` has an English default) — otherwise the user now sees the raw key.
 
    The detail is not lost: it goes to the logger at `warning` under
    `{your audit channel}.provider_error`, with the exception attached. It was developer-facing text

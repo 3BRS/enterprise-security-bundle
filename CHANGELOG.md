@@ -6,6 +6,14 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 ## [2.2.2] - 2026-08-24
 
 ### Added
+- **English translation catalogues** in `src/Resources/translations/` — `validators.en.yaml`,
+  `flashes.en.yaml`, `messages.en.yaml` — covering every message id the bundle emits. Symfony
+  registers a bundle's translation directory itself, so an id the consumer had not defined stops
+  surfacing to end users as the raw `three_brs.*` string. They are defaults, not fixtures: the app's
+  `translations/` directory and any bundle registered later both override them, and English is all
+  that ships — other locales stay the consumer's. A unit test holds the catalogues and the ids in
+  `src/` to each other in both directions, so neither a new id without wording nor wording for an id
+  that no longer exists gets through.
 - **`AbstractTwoFactorSetupController::getIssuer()`**, alongside the `isRecoveryCodesEnabled()` /
   `getRecoveryCodesCount()` hooks that were already there, and the provisioning URI is now built
   from it. A consumer resolving the TOTP issuer at runtime (per tenant, per brand, from DB-backed

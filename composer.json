@@ -45,10 +45,12 @@
         "phpstan/phpstan-symfony": "^2.0.3",
         "phpunit/phpunit": "^11.1 || ^12.0.10",
         "symplify/easy-coding-standard": "^12.0",
-        "geoip2/geoip2": "^3.0"
+        "geoip2/geoip2": "^3.0",
+        "symfony/yaml": "^6.4|^7.4"
     },
     "suggest": {
-        "geoip2/geoip2": "Required when wiring ThreeBRS\\EnterpriseSecurityBundle\\Session\\GeoIp\\MaxMindGeoIpLookup as the geoip provider (^3.0)"
+        "geoip2/geoip2": "Required when wiring ThreeBRS\\EnterpriseSecurityBundle\\Session\\GeoIp\\MaxMindGeoIpLookup as the geoip provider (^3.0)",
+        "symfony/translation": "Required (together with symfony/yaml, for the YAML loader) for the English catalogues in src/Resources/translations to be picked up"
     },
     "autoload": {
         "psr-4": {
