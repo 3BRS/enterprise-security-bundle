@@ -227,6 +227,7 @@ Every abstract controller shares the **constructor pattern** from the [worked ex
 - `AbstractTwoFactorSetupController` — TOTP + QR + recovery-code setup wizard.
   `isAcceptableUser`, `isTwoFactorAlreadyEnabled($user)`, `getUsernameForProvisioning($user)`, `createVerifyForm`, `enableTwoFactorAndPersistRecoveryCodes($user, $secret, $plainCodes)`, `getLoginUrl`, `getSetupTemplate`, `getManageTemplate`, `getRecoveryCodesDisplayUrl`, `getPendingSecretSessionKey`, `getPlainRecoveryCodesSessionKey`, `getDisableCsrfTokenId`, `getRegenerateCsrfTokenId`.
   After verification it writes the plaintext recovery codes to session under `getPlainRecoveryCodesSessionKey()` and redirects to `getRecoveryCodesDisplayUrl()` — that URL **must** point to a one-shot display controller you provide (see [Controllers your app must provide §5](controllers-you-provide.md#5-recovery-codes-one-shot-display-page-critical)).
+  Three constructor values are additionally read through overridable getters — `isRecoveryCodesEnabled()`, `getRecoveryCodesCount()` and `getIssuer()` — so a subclass that resolves them at runtime (from DB-backed settings, per tenant or per brand) overrides the getter instead of reimplementing `__invoke()`.
 - `AbstractTwoFactorRecoveryChallengeController` — recovery-code login completion.
   `isAcceptableUser`, `verifyAndConsumeRecoveryCode($user, $code): bool`, `getFirewallName`, `getDefaultRedirectUrl`, `getTemplate`
 - `AbstractTwoFactorDisableController` — disable + invalidate codes + rotate trusted-token.

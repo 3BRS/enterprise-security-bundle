@@ -84,6 +84,45 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
         self::assertFalse($captured['recovery_codes_enabled']);
     }
 
+    public function testProvisioningUriIsBuiltFromTheIssuerGetter(): void
+    {
+        // Consumers that resolve the issuer at runtime (per tenant / brand / DB-backed settings)
+        // override the getter rather than reimplementing `__invoke`, so the provisioning URI has
+        // to be built from the getter and not from the cached constructor value.
+        $issuerPassedToGenerator = null;
+        $controller = $this->makeController(
+            form: $this->unsubmittedForm(),
+            issuerCapture: $issuerPassedToGenerator,
+        );
+
+        $controller($this->requestWithSession());
+
+        self::assertSame('Example', $issuerPassedToGenerator);
+
+        $overriddenIssuer = null;
+        $controller = $this->makeController(
+            form: $this->unsubmittedForm(),
+            overrideIssuer: 'Tenant Brand',
+            issuerCapture: $overriddenIssuer,
+        );
+
+        $controller($this->requestWithSession());
+
+        self::assertSame('Tenant Brand', $overriddenIssuer);
+    }
+
+    /**
+     * @return FormInterface<mixed>
+     */
+    protected function unsubmittedForm(): FormInterface
+    {
+        $form = $this->createStub(FormInterface::class);
+        $form->method('isSubmitted')->willReturn(false);
+        $form->method('createView')->willReturn($this->createStub(FormView::class));
+
+        return $form;
+    }
+
     protected function requestWithSession(): Request
     {
         $request = new Request();
@@ -103,6 +142,8 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
         ?bool $overrideEnabled = null,
         ?int $overrideCount = null,
         array &$templateCapture = [],
+        ?string $overrideIssuer = null,
+        ?string &$issuerCapture = null,
     ): AbstractTwoFactorSetupController {
         $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn(new TestUser());
@@ -112,7 +153,13 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
 
         $totp = $this->createStub(TotpSecretGeneratorInterface::class);
         $totp->method('generateSecret')->willReturn('SECRET');
-        $totp->method('buildProvisioningUri')->willReturn('otpauth://totp/x');
+        $totp->method('buildProvisioningUri')->willReturnCallback(
+            static function (string $secret, string $username, string $issuer) use (&$issuerCapture): string {
+                $issuerCapture = $issuer;
+
+                return 'otpauth://totp/x';
+            },
+        );
         $totp->method('verifyCode')->willReturn(false);
 
         $qr = $this->createStub(QrCodeGeneratorInterface::class);
@@ -138,7 +185,7 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
 
         $form ??= $this->createStub(FormInterface::class);
 
-        return new class($tokenStorage, $totp, $qr, $recovery, $router, $twig, $translator, $csrf, 'Example', true, 10, $acceptUser, $alreadyEnabled, $form, $overrideEnabled, $overrideCount) extends AbstractTwoFactorSetupController {
+        return new class($tokenStorage, $totp, $qr, $recovery, $router, $twig, $translator, $csrf, 'Example', true, 10, $acceptUser, $alreadyEnabled, $form, $overrideEnabled, $overrideCount, $overrideIssuer) extends AbstractTwoFactorSetupController {
             /**
              * @param FormInterface<mixed> $form
              */
@@ -159,6 +206,7 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
                 protected FormInterface $form,
                 protected ?bool $overrideEnabled,
                 protected ?int $overrideCount,
+                protected ?string $overrideIssuer,
             ) {
                 parent::__construct($tokenStorage, $totp, $qr, $recovery, $router, $twig, $translator, $csrf, $issuer, $recoveryEnabled, $recoveryCount);
             }
@@ -171,6 +219,11 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
             protected function getRecoveryCodesCount(): int
             {
                 return $this->overrideCount ?? parent::getRecoveryCodesCount();
+            }
+
+            protected function getIssuer(): string
+            {
+                return $this->overrideIssuer ?? parent::getIssuer();
             }
 
             protected function isAcceptableUser(UserInterface $user): bool

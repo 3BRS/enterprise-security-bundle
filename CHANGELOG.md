@@ -5,6 +5,12 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
 
 ## [2.2.2] - 2026-08-24
 
+### Added
+- **`AbstractTwoFactorSetupController::getIssuer()`**, alongside the `isRecoveryCodesEnabled()` /
+  `getRecoveryCodesCount()` hooks that were already there, and the provisioning URI is now built
+  from it. A consumer resolving the TOTP issuer at runtime (per tenant, per brand, from DB-backed
+  settings) overrides one method instead of copying ~60 lines of `__invoke()`.
+
 ### Fixed
 - **An unknown `two_factor_authentication.mode` no longer takes the whole application down.**
   `PolicyFactory::twoFactorMode()` called `TwoFactorMode::from()` on a value read from a settings
