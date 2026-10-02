@@ -3,6 +3,27 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [2.4.0] - 2026-10-02
+
+### Security
+- **Linking an OAuth account needs a full sign-in.** `AbstractOAuthCallbackController::handleLinkIntent()`
+  took the current user from `Security::getUser()`, which also returns the user of scheb's
+  `TwoFactorToken` — after the password, before the code — and `AbstractOAuthInitiateController`
+  started `intent=link` without looking at the sign-in at all. With the OAuth routes on
+  `PUBLIC_ACCESS`, which scheb lets through while a sign-in waits for its code, anyone who knew only
+  the password could link their own provider account to the victim's and sign in through it from then
+  on, without the code. For a `form_post` provider (Apple) the initiate step also put the victim into
+  the signed state cookie, and the callback signed the attacker in on the spot.
+
+  Both steps now link only for `IS_AUTHENTICATED_FULLY`, through the new `isLinkAllowed()` on each
+  controller. The initiate step throws `AccessDeniedException`, which the firewall answers with the
+  code page or the sign-in page; the user's identifier goes into the state cookie only after a full
+  sign-in; the callback with a session takes the current user only after a full sign-in. A sign-in
+  restored from a remember-me cookie no longer links either, since a link adds a way into the account.
+  Without the optional `Security` constructor argument, `AbstractOAuthInitiateController` refuses
+  every link. Signing in through a provider while a sign-in waits for its code is unchanged — see
+  [UPGRADE.md](UPGRADE.md#230--240).
+
 ## [2.3.0] - 2026-08-24
 
 ### Added
@@ -255,6 +276,7 @@ Documentation-only corrections, of statements that promised a guarantee the code
 ## [1.0.0] - 2026-06-15
 - Initial release.
 
+[2.4.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.3.0...v2.4.0
 [2.1.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.0.0...v1.1.0

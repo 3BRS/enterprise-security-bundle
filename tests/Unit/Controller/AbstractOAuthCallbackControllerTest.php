@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Authorization\Voter\AuthenticatedVoter;
 use Symfony\Component\Security\Core\Exception\DisabledException;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -224,6 +225,94 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         self::assertSame('/login', $response->getTargetUrl());
     }
 
+    public function testLinkIsRefusedWhileTheSignInWaitsForTheCode(): void
+    {
+        // Security::getUser() returns the user of scheb's TwoFactorToken too, i.e. after the password
+        // but before the code; only IS_AUTHENTICATED_FULLY tells the two apart.
+        $tokenStorage = $this->createMock(TokenStorageInterface::class);
+        $tokenStorage->expects(self::never())->method('setToken');
+
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(
+            tokenStorage: $tokenStorage,
+            recorder: $recorder,
+            security: $this->securityFor(new TestUser('victim'), fullyAuthenticated: false),
+        );
+
+        $request = $this->requestWithSession();
+        $request->getSession()->set('intent', 'link');
+
+        $response = $controller($request, 'google');
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+        self::assertArrayNotHasKey('linkedUser', $recorder);
+
+        $session = $request->getSession();
+        self::assertInstanceOf(Session::class, $session);
+        self::assertContains('three_brs.ui.social_login.not_logged_in', $session->getFlashBag()->peek('error'));
+    }
+
+    public function testLinksTheIdentityToAFullySignedInUser(): void
+    {
+        $user = new TestUser('linker');
+
+        $tokenStorage = $this->createMock(TokenStorageInterface::class);
+        $tokenStorage->expects(self::never())->method('setToken');
+
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(
+            tokenStorage: $tokenStorage,
+            recorder: $recorder,
+            security: $this->securityFor($user, fullyAuthenticated: true),
+        );
+
+        $request = $this->requestWithSession();
+        $request->getSession()->set('intent', 'link');
+
+        $response = $controller($request, 'google');
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/social-accounts', $response->getTargetUrl());
+        self::assertSame($user, $recorder['linkedUser'] ?? null);
+    }
+
+    public function testFormPostLinkWithoutAUserInTheStateCookieIsRefusedWhileTheSignInWaitsForTheCode(): void
+    {
+        // The initiate step puts the user into the state cookie only after a full sign-in, so a
+        // cookie without one must not fall back to the user of a sign-in that waits for its code.
+        $provider = $this->createStub(FormPostCallbackTestProviderInterface::class);
+        $provider->method('fetchUserInfo')->willReturn(new OAuthUserInfo('apple', 'pid-1', 'user@example.com'));
+
+        $registry = $this->createStub(OAuthProviderRegistryInterface::class);
+        $registry->method('has')->willReturn(true);
+        $registry->method('get')->willReturn($provider);
+
+        $tokenStorage = $this->createMock(TokenStorageInterface::class);
+        $tokenStorage->expects(self::never())->method('setToken');
+
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(
+            registry: $registry,
+            identifierUser: new TestUser('victim'),
+            tokenStorage: $tokenStorage,
+            recorder: $recorder,
+            security: $this->securityFor(new TestUser('victim'), fullyAuthenticated: false),
+        );
+
+        $request = $this->requestWithSession();
+        $request->cookies->set('state_apple', ($this->signer())->encode([
+            'state' => 'cookie-state',
+            'intent' => 'link',
+        ]));
+
+        $response = $controller($request, 'apple');
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+        self::assertArrayNotHasKey('linkedUser', $recorder);
+    }
+
     public function testRefusesADisabledAccountOnTheSessionlessLinkPathWithoutAuthenticatingOrLinking(): void
     {
         // The cross-site form_post link resolves the user from the signed state cookie rather than
@@ -367,6 +456,17 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         self::assertContains('three_brs.account_state.sign_in_refused', $session->getFlashBag()->peek('error'));
     }
 
+    protected function securityFor(UserInterface $user, bool $fullyAuthenticated): Security
+    {
+        $security = $this->createStub(Security::class);
+        $security->method('isGranted')->willReturnCallback(
+            static fn (mixed $attribute): bool => $fullyAuthenticated && $attribute === AuthenticatedVoter::IS_AUTHENTICATED_FULLY,
+        );
+        $security->method('getUser')->willReturn($user);
+
+        return $security;
+    }
+
     protected function refusingUserChecker(): UserCheckerInterface
     {
         $userChecker = $this->createStub(UserCheckerInterface::class);
@@ -413,8 +513,10 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         ?\ArrayObject $recorder = null,
         ?UserInterface $registeredUser = null,
         ?LoggerInterface $logger = null,
+        ?Security $security = null,
     ): AbstractOAuthCallbackController {
         $userChecker ??= $this->createStub(UserCheckerInterface::class);
+        $security ??= $this->createStub(Security::class);
         $recorder ??= new \ArrayObject();
         $logger ??= new NullLogger();
 
@@ -430,7 +532,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $router = $this->createStub(RouterInterface::class);
         $router->method('generate')->willReturnCallback(static fn (string $name) => '/' . str_replace('_', '-', $name));
 
-        return new class($registry, $router, $tokenStorage ?? $this->createStub(TokenStorageInterface::class), $this->createStub(Security::class), $logger, $this->signer(), $userChecker, $existingUser, $identifierUser, $emailUser, $recorder, $registeredUser) extends AbstractOAuthCallbackController {
+        return new class($registry, $router, $tokenStorage ?? $this->createStub(TokenStorageInterface::class), $security, $logger, $this->signer(), $userChecker, $existingUser, $identifierUser, $emailUser, $recorder, $registeredUser) extends AbstractOAuthCallbackController {
             /**
              * @param \ArrayObject<string, mixed> $recorder
              */

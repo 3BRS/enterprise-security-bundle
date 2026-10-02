@@ -89,3 +89,13 @@ To make `enforced` mode bite — holding users who have *not* enrolled at the se
 ## OAuth
 
 OAuth itself doesn't need security.yaml changes — the bundle's `AbstractOAuthCallbackController` handles the entire flow and manually sets the security token. Just register the bundle's `GoogleOAuthProvider`, `AppleOAuthProvider` and `MicrosoftOAuthProvider` services (or your own implementations) with the `three_brs.oauth_provider` tag and the bundle's registry picks them up.
+
+With two-factor authentication on the firewall, scheb lets a sign-in that waits for its code open only `PUBLIC_ACCESS` paths (plus the paths whose rule its token satisfies, and logout). Give the OAuth initiate, callback and confirm-link routes `PUBLIC_ACCESS` if a user on the code page should be able to sign in with a provider instead (paths as in [Routes](routes.md)):
+
+```yaml
+security:
+    access_control:
+        - { path: ^/oauth/, role: PUBLIC_ACCESS }
+```
+
+Linking stays closed on those routes: `AbstractOAuthInitiateController` and `AbstractOAuthCallbackController` link only for `IS_AUTHENTICATED_FULLY`, which scheb's token does not satisfy.

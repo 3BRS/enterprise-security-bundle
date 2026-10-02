@@ -189,3 +189,23 @@ your own copies of the same logic:
    catching the insert conflict (`isConcurrentInsertConflict()`), which is what keeps a user from
    getting two "new device" mails for one sign-in. Without the constraint it still works, it just
    loses that protection.
+
+## 2.3.0 → 2.4.0
+
+1. **Linking an OAuth account needs a full sign-in** (`IS_AUTHENTICATED_FULLY`). A sign-in that waits
+   for its two-factor code could link a provider account and so get past the code; that is closed in
+   `AbstractOAuthInitiateController` and `AbstractOAuthCallbackController` themselves.
+   - Pass the `Security` constructor argument to your `AbstractOAuthInitiateController` subclass
+     (`$security: '@security.helper'`) if you have not: without it every `intent=link` now ends in an
+     `AccessDeniedException`.
+   - A user signed in through a remember-me cookie who starts a link is sent to the sign-in page; the
+     firewall saves the link as the target path, which the default success handler returns them to.
+     To let them link without signing in again, override `isLinkAllowed()` in both subclasses with
+     `AuthenticatedVoter::IS_AUTHENTICATED_REMEMBERED`, which a sign-in waiting for its two-factor code
+     does not satisfy either.
+   - If you closed the hole yourself — `isAcceptableCurrentUser()` refusing a `TwoFactorTokenInterface`
+     in your callback subclass, `createStateCookie()` leaving the user out for one in your initiate
+     subclass — the overrides can go.
+   - With 2FA on the firewall, the OAuth routes can have `PUBLIC_ACCESS`, so that a user on the code
+     page can sign in with a provider instead; see
+     [Security configuration](docs/security-configuration.md#oauth).
