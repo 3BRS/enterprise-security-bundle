@@ -23,6 +23,16 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   Without the optional `Security` constructor argument, `AbstractOAuthInitiateController` refuses
   every link. Signing in through a provider while a sign-in waits for its code is unchanged — see
   [UPGRADE.md](UPGRADE.md#230--240).
+- **Switching two-factor authentication off can ask for a code.** `AbstractTwoFactorDisableController`
+  checked the CSRF token only, so anyone with the signed-in session disabled 2FA in one click. Given
+  scheb's TOTP authenticator as the new optional `$totpAuthenticator` constructor argument, it takes
+  the current TOTP code (`TotpAuthenticator::checkCode()`) or a recovery code (the new
+  `verifyRecoveryCode()` hook) from `_code`, and with the also new optional `$rateLimitGuard` it counts
+  every attempt against the user under the `two_factor_disable` action, group from
+  `getRateLimitGroup()`. A refused code flashes `three_brs.two_factor.disable_code_invalid` and goes to
+  `getRedirectAfterRefusedCodeUrl()`. No password is asked: accounts created through a social sign-in
+  have none. Both arguments are optional so that subclasses keep working; without `$totpAuthenticator`
+  the controller disables on the CSRF token alone, as before.
 
 ### Added
 - **`PendingSignInCanceller` and `CancelPendingSignInRequiredHandler`** end a sign-in that waits for

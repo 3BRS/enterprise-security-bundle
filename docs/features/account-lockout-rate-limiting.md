@@ -26,11 +26,11 @@ Throttles repeated requests to sensitive endpoints, and — unlike lockout — c
 - `DynamicRateLimiterFactory` (`DynamicRateLimiterFactoryInterface`) — builds Symfony `fixed_window` limiters **at runtime** from the settings (id `three_brs_{group}_{action}`), backed by the bundle's `three_brs.rate_limiter.storage`. No static `framework.yaml` limiter wiring needed (see [Configuration §1](../configuration.md#1-rate-limiter-cache-pool-auto-configured) for the cache pool).
 - `RateLimitGuard` (`RateLimitGuardInterface`) — the controller-facing helper: `isEnabled($group, $action)`, `consume(Request $request, $group, $action, ?$userIdentifier)`, `reset($group, $action, $userIdentifier)`. What each counter is keyed on, and how to change it, is [below](#how-a-request-is-keyed).
 
-Throttled actions: `login`, `password_reset`, `register` (customer only — admin has no self-registration), `magic_link`. When a limit is exceeded, `RateLimitGuard::consume()` throws a `TooManyRequestsHttpException` (HTTP 429) carrying the `three_brs.rate_limit.too_many_requests` message key — catch it where you call the guard and surface it however suits your UI (flash + redirect, JSON error, …).
+Throttled actions: `login`, `password_reset`, `register` (customer only — admin has no self-registration), `magic_link`, `two_factor_disable` (the code that confirms switching 2FA off — `AbstractTwoFactorDisableController` consumes it itself when given the guard). When a limit is exceeded, `RateLimitGuard::consume()` throws a `TooManyRequestsHttpException` (HTTP 429) carrying the `three_brs.rate_limit.too_many_requests` message key — catch it where you call the guard and surface it however suits your UI (flash + redirect, JSON error, …).
 
 ### How a request is keyed
 
-`consume()` derives the counter key from its `$userIdentifier` argument: pass one and the counter is per username (lowercased), omit it and the counter is per `Request::getClientIp()`. The bundled flows pass the username for `login` — so an admin unlock can clear that counter deterministically through `reset()` — and omit it for `password_reset`, `register` and `magic_link`, which have no known account yet.
+`consume()` derives the counter key from its `$userIdentifier` argument: pass one and the counter is per username (lowercased), omit it and the counter is per `Request::getClientIp()`. The bundled flows pass the username for `login` — so an admin unlock can clear that counter deterministically through `reset()` — and for `two_factor_disable` (the signed-in user), and omit it for `password_reset`, `register` and `magic_link`, which have no known account yet.
 
 **A counter keyed on the client IP is worth exactly what your proxy configuration is worth.** `Request::getClientIp()` returns `REMOTE_ADDR` unless `framework.trusted_proxies` is set, and behind a load balancer, an ingress controller or a CDN that is the *proxy's* address — identical for every visitor. There are two ways to get this wrong, in opposite directions:
 
@@ -106,11 +106,14 @@ parameters:
             rate_limit.magic_link.enabled: false
             rate_limit.magic_link.limit: 3
             rate_limit.magic_link.interval: '15 minutes'
+            rate_limit.two_factor_disable.enabled: true
+            rate_limit.two_factor_disable.limit: 5
+            rate_limit.two_factor_disable.interval: '15 minutes'
         admin:
             account_lockout.enabled: false
             account_lockout.max_attempts: 3
             account_lockout.auto_unlock_after: ~
-            # rate_limit.login / password_reset / magic_link — same keys as customer (no `register`)
+            # rate_limit.login / password_reset / magic_link / two_factor_disable — same keys as customer (no `register`)
 ```
 
 > **Suggested ranges** (validate in your settings UI — the bundle does not clamp them): `max_attempts` 1–20; `auto_unlock_after` 1–86400; rate-limit `limit` 1–1000.

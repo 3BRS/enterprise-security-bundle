@@ -223,3 +223,20 @@ your own copies of the same logic:
    for a firewall — see
    [Leaving the code page](docs/features/two-factor-authentication.md#leaving-the-code-page). If you
    built the same thing in your app, it can go once these are wired.
+
+4. **Ask for a code before two-factor authentication is switched off.** `AbstractTwoFactorDisableController`
+   still disables on the CSRF token alone until you wire the new optional constructor arguments:
+   - `$totpAuthenticator: '@scheb_two_factor.security.totp_authenticator'` — the POST then has to carry
+     the current TOTP code in `_code`. Add the field to the disable form on your 2FA manage page.
+   - Override `verifyRecoveryCode(UserInterface $user, string $code): bool` to accept a recovery code
+     as well (the default refuses them); nothing needs to be consumed, `disableTwoFactorAndCommit()`
+     deletes them all.
+   - `$rateLimitGuard: '@ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuard'` and an override of
+     `getRateLimitGroup()` returning `customer` or `admin` — without them the form lets whoever holds
+     the session guess the code. Add `rate_limit.two_factor_disable.{enabled,limit,interval}` to your
+     settings defaults for that scope (e.g. `true`, `5`, `'15 minutes'`).
+   - Override `getRedirectAfterRefusedCodeUrl()` to send a refused code back to the manage page (by
+     default it goes where a successful disable does), and translate
+     `three_brs.two_factor.disable_code_invalid` in the domain you render flashes in.
+   - If your subclass has its own constructor, add the two arguments to it and pass them on to
+     `parent::__construct()`.

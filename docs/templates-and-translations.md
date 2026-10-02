@@ -14,7 +14,7 @@ Templates the bundle controllers will render (you write them):
 | Passkey list | `credentials: list<PasskeyCredentialInterface>` |
 | Locked users list | `users: iterable<User>` |
 | 2FA setup form | `form, qr_data_uri, secret` |
-| 2FA manage page | `disable_csrf_token, regenerate_csrf_token, recovery_codes_enabled` |
+| 2FA manage page | `disable_csrf_token, regenerate_csrf_token, recovery_codes_enabled` — the disable form posts `_csrf_token` and, with the TOTP authenticator wired, `_code` |
 | 2FA recovery challenge | `error: ?string` |
 | Magic link request form | `form` |
 | OAuth confirm link | `email, provider, error: ?string` |
@@ -67,7 +67,7 @@ Added to the session flash bag as raw keys — the bundle does not pick a domain
 | Account state (sign-in refused) | `three_brs.account_state.sign_in_refused` |
 | Lockout (admin unlock) | `three_brs.lockout.unlocked`, `three_brs.lockout.already_unlocked` |
 | Sessions | `three_brs.session.`{`revoked`, `others_revoked`, `cannot_revoke_current`} |
-| Two-factor | `three_brs.two_factor.disabled` |
+| Two-factor | `three_brs.two_factor.disabled`, `three_brs.two_factor.disable_code_invalid` |
 | Magic link | `three_brs.ui.magic_link.`{`request_sent`, `invalid_or_expired`} |
 | Passkey | `three_brs.ui.passkey.`{`removed`, `cannot_remove_last_auth_method`} |
 | Social login | `three_brs.ui.social_login.`{`linked`, `unlinked`, `already_linked`, `already_linked_other_account`, `auto_register_refused`, `cannot_unlink_last_method`, `missing_email`, `not_logged_in`, `provider_error`} |
