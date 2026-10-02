@@ -84,6 +84,8 @@ Make sure your `User` entity also implements scheb's `TwoFactorInterface` from `
 
 Wire `TwoFactorAwareAuthenticationSuccessHandler` on the firewall so your own success handler cannot short-circuit scheb's challenge for a user who has 2FA enabled.
 
+Scheb keeps a sign-in that waits for its code until the session expires. To end it when the user leaves the code page for another page of the firewall, wire `PendingSignInCanceller` and `CancelPendingSignInRequiredHandler` per firewall — see [Leaving the code page](features/two-factor-authentication.md#leaving-the-code-page).
+
 To make `enforced` mode bite — holding users who have *not* enrolled at the setup step — add the listener from [Controllers your app must provide §7](controllers-you-provide.md#7-two-factor-enforcement-listener); the success handler does not cover that case, because scheb only issues a two-factor token for users who are already enrolled.
 
 ## OAuth

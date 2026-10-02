@@ -217,3 +217,9 @@ your own copies of the same logic:
    If your service definition passes `security.authentication.success_handler.<firewall>.form_login`
    as `$defaultSuccessHandler`, replace it with a `DefaultAuthenticationSuccessHandler` service of
    your own — see the [two-factor guide](docs/features/two-factor-authentication.md#scheb-wiring).
+
+3. **Optional: end a sign-in that waits for its two-factor code when the user leaves the code page.**
+   Nothing changes until you wire `PendingSignInCanceller` and `CancelPendingSignInRequiredHandler`
+   for a firewall — see
+   [Leaving the code page](docs/features/two-factor-authentication.md#leaving-the-code-page). If you
+   built the same thing in your app, it can go once these are wired.

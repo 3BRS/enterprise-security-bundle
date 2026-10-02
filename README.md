@@ -36,7 +36,7 @@ The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It 
 **Admin actions** (abstract base controllers): unlock user (after lockout) · cancel pending account deletion · locked users list.
 
 **Security engines & services** (use directly via DI):
-- **2FA:** `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator`, `TwoFactorEnforcementChecker` (+ `TwoFactorMode` enum), `TwoFactorAwareAuthenticationSuccessHandler`
+- **2FA:** `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator`, `TwoFactorEnforcementChecker` (+ `TwoFactorMode` enum), `TwoFactorAwareAuthenticationSuccessHandler`, `PendingSignInCanceller` + `CancelPendingSignInRequiredHandler`
 - **Magic link:** `MagicLinkTokenGenerator`, `MagicLinkTokenValidator`
 - **Passkey:** `PasskeyValidatorFactory`, `PasskeyCeremonyStepManagerFactory`, `PasskeyRelyingPartyEntityFactory`, `PasskeyWebauthnSerializer`, `SessionPasskeyOptionsStorage`
 - **OAuth:** `OAuthProviderRegistry` + Google / Apple / Microsoft providers, `AutoRegistrationPolicy`, `OAuthLinkCodeGenerator` + `CodeChallengeValidator` (confirm-link one-time-code: mint/hash, then verify with expiry + attempt limit + single-use)

@@ -24,6 +24,19 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   every link. Signing in through a provider while a sign-in waits for its code is unchanged — see
   [UPGRADE.md](UPGRADE.md#230--240).
 
+### Added
+- **`PendingSignInCanceller` and `CancelPendingSignInRequiredHandler`** end a sign-in that waits for
+  its two-factor code when the user opens another page of the firewall after the code page was shown.
+  Scheb keeps such a sign-in until the session expires and sends every page that is not public — on
+  a typical shop the home page and the catalogue, which carry no `access_control` rule — back to the
+  code page, so a user who clicked the logo kept landing on it. The handler decorates scheb's
+  `security.authentication.authentication_required_handler.two_factor.<firewall>` and opens the
+  requested page again without the sign-in; the canceller covers `PUBLIC_ACCESS` pages on
+  `kernel.request` right after the firewall. Only page loads cancel, never background requests from
+  the code page, and only once scheb's `FORM` event marked the code page as shown — the sign-in page
+  excepted, which cancels at once. The two-factor pages never cancel. Opt-in per firewall, since it
+  changes scheb's behaviour.
+
 ### Fixed
 - **`TwoFactorAwareAuthenticationSuccessHandler` passes the firewall's options on.** Symfony calls
   `setOptions()` and `setFirewallName()` only on the handler named in the firewall's
