@@ -15,26 +15,60 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   on, without the code. For a `form_post` provider (Apple) the initiate step also put the victim into
   the signed state cookie, and the callback signed the attacker in on the spot.
 
-  Both steps now link only for `IS_AUTHENTICATED_FULLY`, through the new `isLinkAllowed()` on each
-  controller. The initiate step throws `AccessDeniedException`, which the firewall answers with the
+  Both steps now link only after a full sign-in — what `IS_AUTHENTICATED_FULLY` grants with Symfony's
+  and scheb's trust resolvers — checked by the new `FullSignInGuardTrait` through `isLinkAllowed()` on
+  each controller. The initiate step throws `AccessDeniedException`, which the firewall answers with the
   code page or the sign-in page; the user's identifier goes into the state cookie only after a full
   sign-in; the callback with a session takes the current user only after a full sign-in. A sign-in
   restored from a remember-me cookie no longer links either, since a link adds a way into the account.
   Without the optional `Security` constructor argument, `AbstractOAuthInitiateController` refuses
   every link. Signing in through a provider while a sign-in waits for its code is unchanged — see
   [UPGRADE.md](UPGRADE.md#230--240).
-- **Switching two-factor authentication off can ask for a code.** `AbstractTwoFactorDisableController`
-  checked the CSRF token only, so anyone with the signed-in session disabled 2FA in one click. Given
-  scheb's TOTP authenticator as the new optional `$totpAuthenticator` constructor argument, it takes
-  the current TOTP code (`TotpAuthenticator::checkCode()`) or a recovery code (the new
-  `verifyRecoveryCode()` hook) from `_code`, and with the also new optional `$rateLimitGuard` it counts
-  every attempt against the user under the `two_factor_disable` action, group from
-  `getRateLimitGroup()`. A refused code flashes `three_brs.two_factor.disable_code_invalid` and goes to
+- **Registering a passkey needs a full sign-in.** `AbstractPasskeyRegistrationOptionsController` and
+  `AbstractPasskeyRegistrationVerifyController` took the user from any token, a remember-me one
+  included, and a passkey signs in without the second factor: whoever held a stolen remember-me cookie
+  could add their own passkey and keep a way into the account that needs neither the password nor the
+  code. Where the registration routes were `PUBLIC_ACCESS`, a sign-in waiting for its code could do the
+  same on the password alone. Both endpoints now answer `403` unless the sign-in is full, through
+  `FullSignInGuardTrait` and the new `isRegistrationAllowed()` hook.
+- **Managing the second factor needs a full sign-in.** `AbstractTwoFactorSetupController`,
+  `AbstractTwoFactorDisableController` and `AbstractTwoFactorRegenerateRecoveryCodesController` took
+  the user from any token too. A stolen remember-me cookie was enough to switch 2FA off, enrol a
+  second factor of the attacker's own (locking the owner out of the password sign-in), or take a fresh
+  set of recovery codes, which then pass the second factor together with the password. Where those
+  routes allowed `IS_AUTHENTICATED` (which scheb's token satisfies), a sign-in waiting for its code
+  could do the same on the password alone. All three now redirect a sign-in that is not full to
+  `getLoginUrl()`.
+- **Switching two-factor authentication off and regenerating recovery codes can ask for a code.**
+  `AbstractTwoFactorDisableController` checked the CSRF token only, so anyone with the signed-in
+  session disabled 2FA in one click; `AbstractTwoFactorRegenerateRecoveryCodesController` handed the
+  same session a fresh set of recovery codes, one of which would confirm the disable just as well.
+  Given scheb's TOTP authenticator as the new optional `$totpAuthenticator` constructor argument,
+  both take the current TOTP code (`TotpAuthenticator::checkCode()`) or a recovery code (the
+  `verifyRecoveryCode()` hook) from `_code`. With the also new optional `$rateLimitGuard` they count
+  every submitted code against the user under one `two_factor_code` action, group from
+  `getRateLimitGroup()`, leave an empty field uncounted and clear the counter once the action is done.
+  A refused code flashes `three_brs.two_factor.confirmation_code_invalid` and goes to
   `getRedirectAfterRefusedCodeUrl()`. No password is asked: accounts created through a social sign-in
   have none. Both arguments are optional so that subclasses keep working; without `$totpAuthenticator`
-  the controller disables on the CSRF token alone, as before.
+  the controllers act on the CSRF token alone, as before. `$totpAuthenticator` without
+  `$rateLimitGuard` throws a `LogicException` in the constructor, since the code could then be guessed
+  without limit. The limit is on by default: while the settings store has no
+  `rate_limit.two_factor_code.*`, `DynamicRateLimiterFactory` counts 5 attempts per 15 minutes rather
+  than reading the missing `enabled` as off.
 
 ### Added
+- **`TwoFactorCodeConfirmationTrait`** — the code check shared by the disable and regenerate
+  controllers: `confirmCode()`, `clearCodeAttempts()`, `isValidCode()`, `verifyRecoveryCode()`,
+  `getRateLimitGroup()` and `getRedirectAfterRefusedCodeUrl()`.
+- **`FullSignInGuardTrait`** — `isFullSignIn(?TokenInterface $token)`, the check shared by the OAuth
+  link, the passkey registration and the two-factor setup, disable and regenerate controllers: a token
+  with a user that is neither scheb's `TwoFactorTokenInterface` nor a `RememberMeToken`, i.e. what
+  `IS_AUTHENTICATED_FULLY` grants with Symfony's and scheb's trust resolvers.
+- **`DynamicRateLimiterFactory::__construct()` takes `$actionDefaults`** — per action, the `enabled`,
+  `limit` and `interval` used while the settings store has no `rate_limit.{action}.*`. A value the
+  store holds, `false` included, wins. The bundle's service registers `two_factor_code` there; a
+  settings layer that defines the key should default `enabled` to `true`.
 - **`PendingSignInCanceller` and `CancelPendingSignInRequiredHandler`** end a sign-in that waits for
   its two-factor code when the user opens another page of the firewall after the code page was shown.
   Scheb keeps such a sign-in until the session expires and sends every page that is not public — on
@@ -45,15 +79,16 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   `kernel.request` right after the firewall. Only page loads cancel, never background requests from
   the code page, and only once scheb's `FORM` event marked the code page as shown — the sign-in page
   excepted, which cancels at once. The two-factor pages never cancel. Opt-in per firewall, since it
-  changes scheb's behaviour.
+  changes scheb's behaviour — and it reads the session on `PUBLIC_ACCESS` page loads from visitors
+  with a session cookie, which makes those responses `private`.
 
 ### Fixed
 - **`TwoFactorAwareAuthenticationSuccessHandler` passes the firewall's options on.** Symfony calls
   `setOptions()` and `setFirewallName()` only on the handler named in the firewall's
   `success_handler`, and the wrapper had neither, so the wrapped handler never learnt
-  `default_target_path`, `use_referer` or the firewall name — every user without a 2FA challenge
-  landed on `/`, including the one who was sent to sign in from a protected page. The wrapper now
-  implements both and hands them to the wrapped handler when it has them, as Symfony's
+  `default_target_path`, `use_referer` or the firewall name — a user without a 2FA challenge landed
+  on `/` instead of on `default_target_path` or on the protected page that sent them to sign in. The
+  wrapper now implements both and hands them to the wrapped handler when it has them, as Symfony's
   `CustomAuthenticationSuccessHandler` does. The wrapped handler is a shared service, so they go to a
   copy of it; another firewall wrapping the same service keeps its own.
 - The configuration guide no longer says the rate-limiter cache pool needs no action. The bundle

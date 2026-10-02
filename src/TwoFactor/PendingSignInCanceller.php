@@ -111,17 +111,30 @@ class PendingSignInCanceller implements PendingSignInCancellerInterface, EventSu
     }
 
     /**
-     * A page opened in the browser window, not a background request, a frame or a prefetch. A request
-     * without the Sec-Fetch headers counts as a page load.
+     * A page opened in the browser window, not a background request, a frame or a prefetch. Browsers
+     * send the Sec-Fetch headers to secure origins only; without them the Accept header tells a page
+     * from an image or a fetch().
      */
     protected function isPageLoad(Request $request): bool
     {
-        return $request->isMethodSafe()
-            && ! $request->isXmlHttpRequest()
-            && ! $request->headers->has('Sec-Purpose')
-            && ! $request->headers->has('Purpose')
-            && $request->headers->get('Sec-Fetch-Mode', 'navigate') === 'navigate'
+        if (! $request->isMethodSafe() || $request->isXmlHttpRequest() || $this->isPrefetch($request)) {
+            return false;
+        }
+
+        if (! $request->headers->has('Sec-Fetch-Mode')) {
+            return str_contains((string) $request->headers->get('Accept', ''), 'text/html');
+        }
+
+        return $request->headers->get('Sec-Fetch-Mode') === 'navigate'
             && $request->headers->get('Sec-Fetch-Dest', 'document') === 'document';
+    }
+
+    protected function isPrefetch(Request $request): bool
+    {
+        return $request->headers->has('Sec-Purpose')
+            || $request->headers->has('Purpose')
+            || $request->headers->has('X-Purpose')
+            || $request->headers->get('X-Moz') === 'prefetch';
     }
 
     protected function isTwoFactorPage(Request $request): bool

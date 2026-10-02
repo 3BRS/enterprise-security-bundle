@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Core\Authentication\Token\RememberMeToken;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -38,6 +39,27 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertSame('/login', $response->getTargetUrl());
+    }
+
+    public function testRedirectsASignInRestoredFromARememberMeCookieToLogin(): void
+    {
+        $token = $this->createStub(RememberMeToken::class);
+        $token->method('getUser')->willReturn($this->totpUser());
+
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(token: $token, recorder: $recorder);
+
+        $response = $controller($this->requestWithSession());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+        self::assertCount(0, $recorder);
+    }
+
+    public function testNeedsTheRateLimitGuardTogetherWithTheTotpAuthenticator(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->makeController(totpAuthenticator: $this->createStub(TotpAuthenticatorInterface::class), withoutGuard: true);
     }
 
     public function testThrowsBadRequestOnInvalidCsrf(): void
@@ -106,16 +128,19 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertSame('/two-factor', $response->getTargetUrl());
         self::assertArrayNotHasKey('disabledUser', $recorder);
-        self::assertSame(['three_brs.two_factor.disable_code_invalid'], $this->flashes($request, 'error'));
+        self::assertSame(['three_brs.two_factor.confirmation_code_invalid'], $this->flashes($request, 'error'));
     }
 
-    public function testRefusesAMissingCodeWithoutCheckingIt(): void
+    public function testRefusesAMissingCodeWithoutCheckingOrCountingIt(): void
     {
         $totp = $this->createMock(TotpAuthenticatorInterface::class);
         $totp->expects(self::never())->method('checkCode');
 
+        $guard = $this->createMock(RateLimitGuardInterface::class);
+        $guard->expects(self::never())->method('consume');
+
         $recorder = new \ArrayObject();
-        $controller = $this->makeController(user: $this->totpUser(), totpAuthenticator: $totp, recorder: $recorder);
+        $controller = $this->makeController(user: $this->totpUser(), totpAuthenticator: $totp, rateLimitGuard: $guard, recorder: $recorder);
 
         $controller($this->requestWithSession());
 
@@ -144,7 +169,8 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $request = $this->requestWithSession('000000');
 
         $guard = $this->createMock(RateLimitGuardInterface::class);
-        $guard->expects(self::once())->method('consume')->with($request, 'customer', 'two_factor_disable', 'user-id');
+        $guard->expects(self::once())->method('consume')->with($request, 'customer', 'two_factor_code', 'user-id');
+        $guard->expects(self::never())->method('reset');
 
         $totp = $this->createStub(TotpAuthenticatorInterface::class);
         $totp->method('checkCode')->willReturn(false);
@@ -152,6 +178,20 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $controller = $this->makeController(user: $this->totpUser(), totpAuthenticator: $totp, rateLimitGuard: $guard);
 
         $controller($request);
+    }
+
+    public function testClearsTheCounterOnceTwoFactorIsSwitchedOff(): void
+    {
+        $guard = $this->createMock(RateLimitGuardInterface::class);
+        $guard->expects(self::once())->method('consume');
+        $guard->expects(self::once())->method('reset')->with('customer', 'two_factor_code', 'user-id');
+
+        $totp = $this->createStub(TotpAuthenticatorInterface::class);
+        $totp->method('checkCode')->willReturn(true);
+
+        $controller = $this->makeController(user: $this->totpUser(), totpAuthenticator: $totp, rateLimitGuard: $guard);
+
+        $controller($this->requestWithSession('123456'));
     }
 
     public function testRefusesOverTheRateLimitWithoutCheckingTheCode(): void
@@ -235,12 +275,20 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         ?\ArrayObject $recorder = null,
         ?string $validRecoveryCode = null,
         ?string $rateLimitGroup = 'customer',
+        ?TokenInterface $token = null,
+        bool $withoutGuard = false,
     ): AbstractTwoFactorDisableController {
         $csrf = $this->createStub(CsrfTokenManagerInterface::class);
         $csrf->method('isTokenValid')->willReturn($csrfValid);
 
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn($user ?? $this->createStub(UserInterface::class));
+        if ($token === null) {
+            $token = $this->createStub(TokenInterface::class);
+            $token->method('getUser')->willReturn($user ?? $this->createStub(UserInterface::class));
+        }
+
+        if ($totpAuthenticator !== null && $rateLimitGuard === null && ! $withoutGuard) {
+            $rateLimitGuard = $this->createStub(RateLimitGuardInterface::class);
+        }
 
         $tokenStorage = $this->createStub(TokenStorageInterface::class);
         $tokenStorage->method('getToken')->willReturn($token);

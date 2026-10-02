@@ -6,18 +6,27 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Scheb\TwoFactorBundle\Model\Totp\TwoFactorInterface as TotpTwoFactorInterface;
+use Scheb\TwoFactorBundle\Security\TwoFactor\Provider\Totp\TotpAuthenticatorInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Core\Authentication\Token\RememberMeToken;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractTwoFactorRegenerateRecoveryCodesController;
+use ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuardInterface;
 use ThreeBRS\EnterpriseSecurityBundle\TwoFactor\RecoveryCodeGeneratorInterface;
+
+/** @internal test double: a user with TOTP two-factor authentication */
+interface RegenerateTestTotpUserInterface extends UserInterface, TotpTwoFactorInterface
+{
+}
 
 #[CoversClass(AbstractTwoFactorRegenerateRecoveryCodesController::class)]
 class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
@@ -30,6 +39,74 @@ class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertSame('/login', $response->getTargetUrl());
+    }
+
+    public function testRedirectsASignInRestoredFromARememberMeCookieToLogin(): void
+    {
+        $token = $this->createStub(RememberMeToken::class);
+        $token->method('getUser')->willReturn($this->createStub(UserInterface::class));
+
+        $controller = $this->makeController(token: $token);
+        $request = new Request();
+        $request->setSession(new Session(new MockArraySessionStorage()));
+        $response = $controller($request);
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+        self::assertSame([], $request->getSession()->all());
+    }
+
+    public function testRefusesAWrongCodeWithoutReplacingTheRecoveryCodes(): void
+    {
+        // Fresh recovery codes would confirm switching 2FA off, so a session without the second factor
+        // must not obtain them.
+        $totp = $this->createStub(TotpAuthenticatorInterface::class);
+        $totp->method('checkCode')->willReturn(false);
+
+        $recorder = new \ArrayObject();
+        $controller = $this->makeController(
+            totpAuthenticator: $totp,
+            rateLimitGuard: $this->createStub(RateLimitGuardInterface::class),
+            user: $this->totpUser(),
+            recorder: $recorder,
+        );
+
+        $request = $this->requestWithCode('000000');
+        $response = $controller($request);
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/dashboard', $response->getTargetUrl());
+        self::assertCount(0, $recorder);
+        self::assertFalse($request->getSession()->has('plain_codes_key'));
+
+        $session = $request->getSession();
+        self::assertInstanceOf(Session::class, $session);
+        self::assertSame(['three_brs.two_factor.confirmation_code_invalid'], $session->getFlashBag()->peek('error'));
+    }
+
+    public function testRegeneratesWithTheCurrentCodeAndClearsTheCounter(): void
+    {
+        $user = $this->totpUser();
+
+        $totp = $this->createMock(TotpAuthenticatorInterface::class);
+        $totp->expects(self::once())->method('checkCode')->with($user, '123456')->willReturn(true);
+
+        $guard = $this->createMock(RateLimitGuardInterface::class);
+        $guard->expects(self::once())->method('consume');
+        $guard->expects(self::once())->method('reset')->with('customer', 'two_factor_code', 'user-id');
+
+        $controller = $this->makeController(totpAuthenticator: $totp, rateLimitGuard: $guard, user: $user);
+
+        $response = $controller($this->requestWithCode('123456'));
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/recovery', $response->getTargetUrl());
+    }
+
+    public function testNeedsTheRateLimitGuardTogetherWithTheTotpAuthenticator(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->makeController(totpAuthenticator: $this->createStub(TotpAuthenticatorInterface::class));
     }
 
     public function testRedirectsToDashboardWhenRecoveryCodesDisabled(): void
@@ -86,18 +163,47 @@ class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
         self::assertSame([1, 2, 3, 4], $request->getSession()->get('plain_codes_key'));
     }
 
+    protected function requestWithCode(string $code): Request
+    {
+        $request = Request::create('/', 'POST', [
+            '_code' => $code,
+        ]);
+        $request->setSession(new Session(new MockArraySessionStorage()));
+
+        return $request;
+    }
+
+    protected function totpUser(): RegenerateTestTotpUserInterface
+    {
+        $user = $this->createStub(RegenerateTestTotpUserInterface::class);
+        $user->method('isTotpAuthenticationEnabled')->willReturn(true);
+        $user->method('getUserIdentifier')->willReturn('user-id');
+
+        return $user;
+    }
+
+    /**
+     * @param \ArrayObject<int, array<int, string>>|null $recorder records the codes replaceRecoveryCodesAndCommit() stores
+     */
     protected function makeController(
         bool $twoFactorEnabled = true,
         bool $recoveryCodesEnabled = true,
         bool $csrfValid = true,
         ?bool $overrideEnabled = null,
         ?int $overrideCount = null,
+        ?TokenInterface $token = null,
+        ?TotpAuthenticatorInterface $totpAuthenticator = null,
+        ?RateLimitGuardInterface $rateLimitGuard = null,
+        ?UserInterface $user = null,
+        ?\ArrayObject $recorder = null,
     ): AbstractTwoFactorRegenerateRecoveryCodesController {
         $csrf = $this->createStub(CsrfTokenManagerInterface::class);
         $csrf->method('isTokenValid')->willReturn($csrfValid);
 
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn($this->createStub(UserInterface::class));
+        if ($token === null) {
+            $token = $this->createStub(TokenInterface::class);
+            $token->method('getUser')->willReturn($user ?? $this->createStub(UserInterface::class));
+        }
 
         $tokenStorage = $this->createStub(TokenStorageInterface::class);
         $tokenStorage->method('getToken')->willReturn($token);
@@ -107,7 +213,10 @@ class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
 
         $router = $this->createStub(RouterInterface::class);
 
-        return new class($tokenStorage, $generator, $csrf, $router, $recoveryCodesEnabled, 2, $twoFactorEnabled, $overrideEnabled, $overrideCount) extends AbstractTwoFactorRegenerateRecoveryCodesController {
+        return new class($tokenStorage, $generator, $csrf, $router, $recoveryCodesEnabled, 2, $totpAuthenticator, $rateLimitGuard, $twoFactorEnabled, $overrideEnabled, $overrideCount, $recorder ?? new \ArrayObject()) extends AbstractTwoFactorRegenerateRecoveryCodesController {
+            /**
+             * @param \ArrayObject<int, array<int, string>> $recorder
+             */
             public function __construct(
                 TokenStorageInterface $tokenStorage,
                 RecoveryCodeGeneratorInterface $generator,
@@ -115,11 +224,19 @@ class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
                 RouterInterface $router,
                 bool $recoveryCodesEnabled,
                 int $recoveryCodesCount,
+                ?TotpAuthenticatorInterface $totpAuthenticator,
+                ?RateLimitGuardInterface $rateLimitGuard,
                 protected bool $twoFactorEnabled,
                 protected ?bool $overrideEnabled,
                 protected ?int $overrideCount,
+                protected \ArrayObject $recorder,
             ) {
-                parent::__construct($tokenStorage, $generator, $csrf, $router, $recoveryCodesEnabled, $recoveryCodesCount);
+                parent::__construct($tokenStorage, $generator, $csrf, $router, $recoveryCodesEnabled, $recoveryCodesCount, $totpAuthenticator, $rateLimitGuard);
+            }
+
+            protected function getRateLimitGroup(): string
+            {
+                return 'customer';
             }
 
             protected function isRecoveryCodesEnabled(): bool
@@ -144,6 +261,7 @@ class AbstractTwoFactorRegenerateRecoveryCodesControllerTest extends TestCase
 
             protected function replaceRecoveryCodesAndCommit(UserInterface $user, array $plainCodes): void
             {
+                $this->recorder[] = $plainCodes;
             }
 
             protected function getPlainRecoveryCodesSessionKey(): string

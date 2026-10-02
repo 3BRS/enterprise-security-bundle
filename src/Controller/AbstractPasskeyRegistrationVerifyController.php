@@ -11,10 +11,13 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 abstract class AbstractPasskeyRegistrationVerifyController
 {
+    use FullSignInGuardTrait;
+
     protected const MAX_LABEL_LENGTH = 64;
 
     public function __construct(
@@ -32,7 +35,7 @@ abstract class AbstractPasskeyRegistrationVerifyController
 
         $token = $this->tokenStorage->getToken();
         $user = $token?->getUser();
-        if (! $user instanceof UserInterface || ! $this->isAcceptableUser($user)) {
+        if (! $user instanceof UserInterface || ! $this->isRegistrationAllowed($token) || ! $this->isAcceptableUser($user)) {
             throw new AccessDeniedHttpException();
         }
 
@@ -81,6 +84,15 @@ abstract class AbstractPasskeyRegistrationVerifyController
         return new JsonResponse([
             'ok' => true,
         ]);
+    }
+
+    /**
+     * A passkey is a way to sign in to the account that skips the second factor, so registering one
+     * needs a full sign-in (FullSignInGuardTrait).
+     */
+    protected function isRegistrationAllowed(?TokenInterface $token): bool
+    {
+        return $this->isFullSignIn($token);
     }
 
     abstract protected function isAcceptableUser(UserInterface $user): bool;

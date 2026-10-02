@@ -89,7 +89,7 @@ GDPR self-service deletion is two halves: the request/cancel flow (bundle abstra
 
 `TwoFactorEnforcementChecker` answers, per user, whether the scope's mode is `enforced` and the user has not enrolled yet — `shouldEnforceForShopUser()` / `shouldEnforceForAdminUser()`. Turning that answer into pressure is yours:
 
-- An **event listener** (`kernel.request`) that redirects a user the checker flags to your 2FA setup page, from wherever they navigate. Let the setup route itself through, plus logout and your static assets, or the redirect loops.
+- An **event listener** (`kernel.request`) that redirects a user the checker flags to your 2FA setup page, from wherever they navigate. Let the setup route itself through, plus logout and your static assets, or the redirect loops. `AbstractTwoFactorSetupController` sends a sign-in restored from a remember-me cookie to `getLoginUrl()`, so let the sign-in page through too, and make it show the form to such a sign-in (decide on `IS_AUTHENTICATED_FULLY`, not on the presence of a user) — a sign-in page that sends a remembered user back to the site loops the same way.
 - **Menu / route gating** for the `disabled` mode, using `FeatureToggle::isTwoFactorActive($scope)` — the setup controllers stay reachable whatever the mode says, so hide the entry points yourself.
 
 Without the listener, `enforced` reads like a policy but behaves like `allowed`: nothing stops a user from ignoring setup indefinitely.

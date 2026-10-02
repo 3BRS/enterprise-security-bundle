@@ -40,6 +40,41 @@ class DynamicRateLimiterFactoryTest extends TestCase
         self::assertFalse($factory->isEnabled('admin', 'login'));
     }
 
+    public function testActionDefaultsApplyWhileTheSettingsAreMissing(): void
+    {
+        // A store without rate_limit.two_factor_code.* returns null; getBool() would read that as off.
+        $settings = $this->createStub(SettingsProviderInterface::class);
+        $settings->method('get')->willReturn(null);
+
+        $factory = new DynamicRateLimiterFactory($settings, new InMemoryStorage(), [
+            'two_factor_code' => [
+                'enabled' => true,
+                'limit' => 2,
+                'interval' => '15 minutes',
+            ],
+        ]);
+
+        self::assertTrue($factory->isEnabled('customer', 'two_factor_code'));
+        self::assertTrue($factory->consume('customer', 'two_factor_code', 'a@b.com')->isAccepted());
+        self::assertTrue($factory->consume('customer', 'two_factor_code', 'a@b.com')->isAccepted());
+        self::assertFalse($factory->consume('customer', 'two_factor_code', 'a@b.com')->isAccepted());
+    }
+
+    public function testSettingsWinOverActionDefaults(): void
+    {
+        $settings = $this->createStub(SettingsProviderInterface::class);
+        $settings->method('get')->willReturn(false);
+        $settings->method('getBool')->willReturn(false);
+
+        $factory = new DynamicRateLimiterFactory($settings, new InMemoryStorage(), [
+            'two_factor_code' => [
+                'enabled' => true,
+            ],
+        ]);
+
+        self::assertFalse($factory->isEnabled('admin', 'two_factor_code'));
+    }
+
     public function testConsumeAcceptsWhenLimitNotExceeded(): void
     {
         $settings = $this->createStub(SettingsProviderInterface::class);

@@ -7,6 +7,7 @@ namespace Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
+use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorToken;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -14,7 +15,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Routing\RouterInterface;
-use Symfony\Component\Security\Core\Authorization\Voter\AuthenticatedVoter;
+use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractOAuthInitiateController;
@@ -109,14 +110,14 @@ class AbstractOAuthInitiateControllerTest extends TestCase
 
     public function testRefusesALinkWithoutAFullSignIn(): void
     {
-        // A sign-in that waits for its two-factor code (scheb's TwoFactorToken) or one restored from a
-        // remember-me cookie is not IS_AUTHENTICATED_FULLY; the firewall turns the refusal into the
-        // code page or the sign-in page.
-        $security = $this->createMock(Security::class);
-        $security->expects(self::once())
-            ->method('isGranted')
-            ->with(AuthenticatedVoter::IS_AUTHENTICATED_FULLY)
-            ->willReturn(false);
+        // A sign-in that waits for its two-factor code is not a full one; the firewall turns the refusal
+        // into the code page or the sign-in page.
+        $user = new TestUser('victim');
+        $security = $this->createStub(Security::class);
+        $security->method('getToken')->willReturn(
+            new TwoFactorToken(new UsernamePasswordToken($user, 'main', $user->getRoles()), null, 'main', ['totp']),
+        );
+        $security->method('getUser')->willReturn($user);
 
         $controller = $this->makeController(registry: $this->registryFor($this->createStub(FormPostTestProviderInterface::class)), security: $security);
 
@@ -190,9 +191,7 @@ class AbstractOAuthInitiateControllerTest extends TestCase
     protected function securityFor(TestUser $user): Security
     {
         $security = $this->createStub(Security::class);
-        $security->method('isGranted')->willReturnCallback(
-            static fn (mixed $attribute): bool => $attribute === AuthenticatedVoter::IS_AUTHENTICATED_FULLY,
-        );
+        $security->method('getToken')->willReturn(new UsernamePasswordToken($user, 'main', $user->getRoles()));
         $security->method('getUser')->willReturn($user);
 
         return $security;

@@ -19,8 +19,14 @@ use ThreeBRS\EnterpriseSecurityBundle\TwoFactor\RecoveryCodeGeneratorInterface;
 use ThreeBRS\EnterpriseSecurityBundle\TwoFactor\TotpSecretGeneratorInterface;
 use Twig\Environment;
 
+/**
+ * Needs a full sign-in (FullSignInGuardTrait): a sign-in restored from a remember-me cookie could
+ * otherwise enrol a second factor of its own and lock the owner out of the password sign-in.
+ */
 abstract class AbstractTwoFactorSetupController
 {
+    use FullSignInGuardTrait;
+
     public function __construct(
         protected TokenStorageInterface $tokenStorage,
         protected TotpSecretGeneratorInterface $totpGenerator,
@@ -38,8 +44,9 @@ abstract class AbstractTwoFactorSetupController
 
     public function __invoke(Request $request): Response
     {
-        $user = $this->tokenStorage->getToken()?->getUser();
-        if (! $user instanceof UserInterface || ! $this->isAcceptableUser($user)) {
+        $token = $this->tokenStorage->getToken();
+        $user = $token?->getUser();
+        if (! $user instanceof UserInterface || ! $this->isFullSignIn($token) || ! $this->isAcceptableUser($user)) {
             return new RedirectResponse($this->getLoginUrl());
         }
 

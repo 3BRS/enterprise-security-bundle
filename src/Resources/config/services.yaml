@@ -187,6 +187,11 @@ services:
         arguments:
             $settings: '@ThreeBRS\EnterpriseSecurityBundle\Settings\SettingsProviderInterface'
             $storage: '@three_brs.rate_limiter.storage'
+            # Used while the settings store has no rate_limit.two_factor_code.*: guessing the code that
+            # confirms disabling 2FA or regenerating recovery codes stays limited until the settings say
+            # otherwise.
+            $actionDefaults:
+                two_factor_code: { enabled: true, limit: 5, interval: '15 minutes' }
 
     ThreeBRS\EnterpriseSecurityBundle\RateLimit\DynamicRateLimiterFactoryInterface:
         alias: ThreeBRS\EnterpriseSecurityBundle\RateLimit\DynamicRateLimiterFactory

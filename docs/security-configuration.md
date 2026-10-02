@@ -100,4 +100,4 @@ security:
         - { path: ^/oauth/, role: PUBLIC_ACCESS }
 ```
 
-Linking stays closed on those routes: `AbstractOAuthInitiateController` and `AbstractOAuthCallbackController` link only for `IS_AUTHENTICATED_FULLY`, which scheb's token does not satisfy.
+Linking stays closed on those routes: `AbstractOAuthInitiateController` and `AbstractOAuthCallbackController` link only after a full sign-in (`FullSignInGuardTrait`), and scheb's token is not one.

@@ -30,7 +30,25 @@ class CancelPendingSignInRequiredHandlerTest extends TestCase
             ->onAuthenticationRequired($request, $this->createStub(TwoFactorTokenInterface::class));
 
         self::assertInstanceOf(RedirectResponse::class, $response);
-        self::assertSame('/account/orders?page=2', $response->getTargetUrl());
+        self::assertSame('http://localhost/account/orders?page=2', $response->getTargetUrl());
+    }
+
+    public function testRedirectStaysOnTheHostOfTheRequest(): void
+    {
+        // A path beginning with "//" read back as a relative Location would leave the site.
+        $request = new Request(server: [
+            'HTTP_HOST' => 'shop.example',
+            'REQUEST_URI' => '//evil.example/x',
+        ]);
+
+        $canceller = $this->createStub(PendingSignInCancellerInterface::class);
+        $canceller->method('cancelOnPageLoad')->willReturn(true);
+
+        $response = (new CancelPendingSignInRequiredHandler($this->createStub(AuthenticationRequiredHandlerInterface::class), $canceller))
+            ->onAuthenticationRequired($request, $this->createStub(TwoFactorTokenInterface::class));
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertStringStartsWith('http://shop.example/', $response->getTargetUrl());
     }
 
     public function testLeavesAKeptSignInToSchebsHandler(): void

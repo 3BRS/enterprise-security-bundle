@@ -12,7 +12,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
-use Symfony\Component\Security\Core\Authorization\Voter\AuthenticatedVoter;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken;
@@ -27,6 +26,7 @@ abstract class AbstractOAuthCallbackController
     use AccountStateGuardTrait;
     use FirewallRedirectTrait;
     use FlashHelperTrait;
+    use FullSignInGuardTrait;
 
     public function __construct(
         protected OAuthProviderRegistryInterface $registry,
@@ -108,9 +108,8 @@ abstract class AbstractOAuthCallbackController
         // the logged-in user cannot be read from the security context. The initiate step
         // captured the fully signed-in user's identifier into the single-use state cookie;
         // resolve them from it. The link is thus bound to that cookie value rather than a live
-        // session — acceptable because the cookie is HttpOnly + Secure + SameSite=None +
-        // single-use and the OAuth state is validated. (A stricter alternative is to complete
-        // the link on a follow-up same-site request; see docs/oauth-social-login.md.)
+        // session — acceptable because the cookie is HMAC-signed with an expiry, HttpOnly +
+        // Secure + SameSite=None + single-use, and the OAuth state is validated.
         if ($currentUser === null && $linkUserIdentifier !== null && $linkUserIdentifier !== '') {
             $currentUser = $this->findUserByIdentifier($linkUserIdentifier);
             $sessionlessLink = true;
@@ -270,14 +269,13 @@ abstract class AbstractOAuthCallbackController
     }
 
     /**
-     * Linking adds a way to sign in to the account, so it needs a full sign-in: one that waits for
-     * its two-factor code or was restored from a remember-me cookie does not count. A cross-site
-     * form_post callback carries no session; for it the initiate step made this check before it put
-     * the user into the state cookie.
+     * Linking adds a way to sign in to the account, so it needs a full sign-in (FullSignInGuardTrait).
+     * A cross-site form_post callback carries no session; for it the initiate step made this check
+     * before it put the user into the state cookie.
      */
     protected function isLinkAllowed(): bool
     {
-        return $this->security->isGranted(AuthenticatedVoter::IS_AUTHENTICATED_FULLY);
+        return $this->isFullSignIn($this->security->getToken());
     }
 
     /**

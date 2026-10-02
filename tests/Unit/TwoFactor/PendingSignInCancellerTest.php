@@ -179,6 +179,30 @@ class PendingSignInCancellerTest extends TestCase
                 'Purpose' => 'prefetch',
             ],
         ];
+        yield 'Firefox prefetch' => [
+            'GET',
+            [
+                'X-Moz' => 'prefetch',
+            ],
+        ];
+        yield 'Safari preview' => [
+            'GET',
+            [
+                'X-Purpose' => 'preview',
+            ],
+        ];
+        yield 'image without Sec-Fetch headers' => [
+            'GET',
+            [
+                'Accept' => 'image/avif,image/webp,*/*',
+            ],
+        ];
+        yield 'fetch without Sec-Fetch headers' => [
+            'GET',
+            [
+                'Accept' => '*/*',
+            ],
+        ];
         yield 'form submission' => ['POST', []];
     }
 

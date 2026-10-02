@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorToken;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,7 +18,7 @@ use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
-use Symfony\Component\Security\Core\Authorization\Voter\AuthenticatedVoter;
+use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Exception\DisabledException;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -458,9 +459,11 @@ class AbstractOAuthCallbackControllerTest extends TestCase
 
     protected function securityFor(UserInterface $user, bool $fullyAuthenticated): Security
     {
+        $token = new UsernamePasswordToken($user, 'shop', $user->getRoles());
+
         $security = $this->createStub(Security::class);
-        $security->method('isGranted')->willReturnCallback(
-            static fn (mixed $attribute): bool => $fullyAuthenticated && $attribute === AuthenticatedVoter::IS_AUTHENTICATED_FULLY,
+        $security->method('getToken')->willReturn(
+            $fullyAuthenticated ? $token : new TwoFactorToken($token, null, 'shop', ['totp']),
         );
         $security->method('getUser')->willReturn($user);
 

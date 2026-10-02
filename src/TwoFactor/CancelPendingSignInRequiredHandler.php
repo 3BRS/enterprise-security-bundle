@@ -12,9 +12,10 @@ use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 
 /**
  * Decorates scheb's security.authentication.authentication_required_handler.two_factor.<firewall>, which
- * runs after the password and for every page a sign-in waiting for its two-factor code may not open.
- * When the canceller cancels the sign-in, the requested page is opened again, now without it; otherwise
- * scheb's handler sends the user to the code page.
+ * scheb calls for every page a sign-in waiting for its two-factor code may not open, and
+ * TwoFactorAwareAuthenticationSuccessHandler right after the password. When the canceller cancels the
+ * sign-in, the requested page is opened again, now without it; otherwise scheb's handler sends the user
+ * to the code page.
  */
 class CancelPendingSignInRequiredHandler implements CancelPendingSignInRequiredHandlerInterface
 {
@@ -27,7 +28,7 @@ class CancelPendingSignInRequiredHandler implements CancelPendingSignInRequiredH
     public function onAuthenticationRequired(Request $request, TokenInterface $token): Response
     {
         if ($this->pendingSignInCanceller->cancelOnPageLoad($request)) {
-            return new RedirectResponse($request->getRequestUri());
+            return new RedirectResponse($request->getUri());
         }
 
         return $this->inner->onAuthenticationRequired($request, $token);

@@ -10,7 +10,6 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
-use Symfony\Component\Security\Core\Authorization\Voter\AuthenticatedVoter;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
@@ -20,6 +19,8 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 abstract class AbstractOAuthInitiateController
 {
+    use FullSignInGuardTrait;
+
     protected const STATE_COOKIE_LIFETIME = 600;
 
     public function __construct(
@@ -113,13 +114,12 @@ abstract class AbstractOAuthInitiateController
     }
 
     /**
-     * Linking adds a way to sign in to the account, so it needs a full sign-in: one that waits for
-     * its two-factor code or was restored from a remember-me cookie does not count. Without the
-     * Security service no link is allowed.
+     * Linking adds a way to sign in to the account, so it needs a full sign-in (FullSignInGuardTrait).
+     * Without the Security service no link is allowed.
      */
     protected function isLinkAllowed(): bool
     {
-        return $this->security?->isGranted(AuthenticatedVoter::IS_AUTHENTICATED_FULLY) === true;
+        return $this->isFullSignIn($this->security?->getToken());
     }
 
     abstract protected function isProviderEnabledForScope(OAuthProviderInterface $provider): bool;
