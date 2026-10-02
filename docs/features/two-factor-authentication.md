@@ -15,7 +15,7 @@ TOTP-based 2FA (Google Authenticator, Authy, 1Password, …), built on top of [`
 - `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator` (each with an `*Interface`) — the setup building blocks.
 - `TwoFactorMode` enum — `disabled` / `allowed` / `enforced`.
 - `TwoFactorEnforcementChecker` (`TwoFactorEnforcementCheckerInterface`) — `shouldEnforceForShopUser()` / `shouldEnforceForAdminUser()` return true when the scope's mode is `enforced` **and** the user has not enabled 2FA. Use it to redirect such users to setup until they enrol.
-- `TwoFactorAwareAuthenticationSuccessHandler` — wraps your default success handler: if the post-login token is a scheb `TwoFactorTokenInterface` it hands off to scheb's "2FA required" handler (so the challenge UX is honoured), otherwise it delegates to the default handler. Without it, a default handler can short-circuit the 2FA challenge (e.g. redirect or return JSON straight away).
+- `TwoFactorAwareAuthenticationSuccessHandler` — wraps your default success handler: if the post-login token is a scheb `TwoFactorTokenInterface` it hands off to scheb's "2FA required" handler (so the challenge UX is honoured), otherwise it delegates to the default handler. Without it, a default handler can short-circuit the 2FA challenge (e.g. redirect or return JSON straight away). Symfony passes the firewall's success-handler options (`default_target_path`, `use_referer`, …) and its name to the wrapper, which hands them to a copy of the wrapped handler (`setOptions()` / `setFirewallName()`, when it has them) — so the saved target path and `default_target_path` keep working, and one default handler service can serve several firewalls.
 - Flow controllers (extend + bind): `AbstractTwoFactorSetupController`, `AbstractTwoFactorRecoveryChallengeController`, `AbstractTwoFactorDisableController`, `AbstractTwoFactorRegenerateRecoveryCodesController` — each one's abstract methods (its bind surface) are listed in [Controllers](../controllers.md#reference-abstract-controllers-and-their-bind-surface), and the extend/register/route pattern is in the [worked example](../controllers.md#example-passkey-login-verify-the-webauthn-assertion-endpoint).
 - User mixin: `TwoFactorAuthShopUserInterface` / `TwoFactorAuthAdminUserInterface` (store `totpSecret`, `twoFactorEnabled`, `trustedTokenVersion`). Your entity also implements scheb's `TwoFactorInterface` for the verification hook. Trusted devices are revoked per user by bumping `trustedTokenVersion`.
 
@@ -91,15 +91,22 @@ security:
                 success_handler: App\Security\AppTwoFactorSuccessHandler   # instance of the bundle handler
 ```
 
-Register the handler instance per firewall, wrapping scheb's required-handler and your default success handler:
+Register the handler instance per firewall, wrapping scheb's required-handler and a default success handler of its own. Do not pass `security.authentication.success_handler.main.form_login`: with `success_handler` set, that service is the one Symfony builds around this handler, so the reference would be circular.
 
 ```yaml
 services:
+    app.default_success_handler:
+        class: Symfony\Component\Security\Http\Authentication\DefaultAuthenticationSuccessHandler
+        arguments:
+            $httpUtils: '@security.http_utils'
+
     App\Security\AppTwoFactorSuccessHandler:
         class: ThreeBRS\EnterpriseSecurityBundle\TwoFactor\TwoFactorAwareAuthenticationSuccessHandler
         arguments:
             $twoFactorAuthenticationRequiredHandler: '@security.authentication.authentication_required_handler.two_factor.main'
-            $defaultSuccessHandler: '@security.authentication.success_handler.main.form_login'
+            $defaultSuccessHandler: '@app.default_success_handler'
 ```
 
-For **two firewalls**, repeat the firewall block and register a second handler instance bound to that firewall's scheb required-handler. See [Security configuration](../security-configuration.md#two-factor-authentication).
+The `form_login` options of the firewall (`default_target_path`, `use_referer`, …) reach `app.default_success_handler` through the wrapper, so they stay in `security.yaml`.
+
+For **two firewalls**, repeat the firewall block and register a second handler instance bound to that firewall's scheb required-handler; both can wrap the same default success handler. See [Security configuration](../security-configuration.md#two-factor-authentication).

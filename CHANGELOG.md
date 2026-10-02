@@ -24,6 +24,19 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   every link. Signing in through a provider while a sign-in waits for its code is unchanged — see
   [UPGRADE.md](UPGRADE.md#230--240).
 
+### Fixed
+- **`TwoFactorAwareAuthenticationSuccessHandler` passes the firewall's options on.** Symfony calls
+  `setOptions()` and `setFirewallName()` only on the handler named in the firewall's
+  `success_handler`, and the wrapper had neither, so the wrapped handler never learnt
+  `default_target_path`, `use_referer` or the firewall name — every user without a 2FA challenge
+  landed on `/`, including the one who was sent to sign in from a protected page. The wrapper now
+  implements both and hands them to the wrapped handler when it has them, as Symfony's
+  `CustomAuthenticationSuccessHandler` does. The wrapped handler is a shared service, so they go to a
+  copy of it; another firewall wrapping the same service keeps its own.
+- The two-factor guide no longer wires `security.authentication.success_handler.<firewall>.form_login`
+  as the wrapped handler: with `success_handler` set, that is the service Symfony builds around the
+  wrapper itself.
+
 ## [2.3.0] - 2026-08-24
 
 ### Added

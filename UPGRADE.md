@@ -209,3 +209,11 @@ your own copies of the same logic:
    - With 2FA on the firewall, the OAuth routes can have `PUBLIC_ACCESS`, so that a user on the code
      page can sign in with a provider instead; see
      [Security configuration](docs/security-configuration.md#oauth).
+
+2. **`TwoFactorAwareAuthenticationSuccessHandler` now forwards the firewall's `form_login` options**
+   (`default_target_path`, `use_referer`, …) and its name to the wrapped handler, so a user who signs
+   in without a 2FA challenge lands where the firewall says instead of on `/`. Nothing to change in
+   `security.yaml`. If you subclassed the handler only to forward them yourself, the subclass can go.
+   If your service definition passes `security.authentication.success_handler.<firewall>.form_login`
+   as `$defaultSuccessHandler`, replace it with a `DefaultAuthenticationSuccessHandler` service of
+   your own — see the [two-factor guide](docs/features/two-factor-authentication.md#scheb-wiring).
