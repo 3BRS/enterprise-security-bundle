@@ -56,6 +56,10 @@ Notable changes to `3brs/enterprise-security-bundle`. Follows
   implements both and hands them to the wrapped handler when it has them, as Symfony's
   `CustomAuthenticationSuccessHandler` does. The wrapped handler is a shared service, so they go to a
   copy of it; another firewall wrapping the same service keeps its own.
+- The configuration guide no longer says the rate-limiter cache pool needs no action. The bundle
+  builds `three_brs.rate_limiter.cache_pool` on `cache.app`, which is a filesystem cache unless
+  configured otherwise; with more than one instance of the application the pool has to be shared
+  (Redis, Memcached, …), or every instance counts its own limits.
 - The two-factor guide no longer wires `security.authentication.success_handler.<firewall>.form_login`
   as the wrapped handler: with `success_handler` set, that is the service Symfony builds around the
   wrapper itself.

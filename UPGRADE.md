@@ -240,3 +240,7 @@ your own copies of the same logic:
      `three_brs.two_factor.disable_code_invalid` in the domain you render flashes in.
    - If your subclass has its own constructor, add the two arguments to it and pass them on to
      `parent::__construct()`.
+
+5. **Running more than one instance?** Make sure `three_brs.rate_limiter.cache_pool` is shared between
+   them. It sits on `cache.app`, a filesystem cache unless you configured it otherwise, and then every
+   instance counts its own rate limits — see [Configuration §1](docs/configuration.md#1-rate-limiter-cache-pool-auto-configured).
