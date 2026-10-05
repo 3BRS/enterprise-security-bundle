@@ -23,6 +23,7 @@ use Symfony\Component\Security\Core\Exception\DisabledException;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractOAuthCallbackController;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
@@ -233,7 +234,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->expects(self::never())->method('setToken');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             tokenStorage: $tokenStorage,
             recorder: $recorder,
@@ -261,7 +262,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->expects(self::never())->method('setToken');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             tokenStorage: $tokenStorage,
             recorder: $recorder,
@@ -292,7 +293,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->expects(self::never())->method('setToken');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             registry: $registry,
             identifierUser: new TestUser('victim'),
@@ -330,7 +331,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->expects(self::never())->method('setToken');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
 
         $controller = $this->makeController(
             registry: $registry,
@@ -362,7 +363,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
 
     public function testRefusesADisabledLinkedAccountWithoutSigningItIn(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
 
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->expects(self::never())->method('setToken');
@@ -419,7 +420,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->expects(self::once())->method('setToken');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             tokenStorage: $tokenStorage,
             recorder: $recorder,
@@ -520,7 +521,7 @@ class AbstractOAuthCallbackControllerTest extends TestCase
     ): AbstractOAuthCallbackController {
         $userChecker ??= $this->createStub(UserCheckerInterface::class);
         $security ??= $this->createStub(Security::class);
-        $recorder ??= new \ArrayObject();
+        $recorder ??= new Recorder();
         $logger ??= new NullLogger();
 
         if ($registry === null) {

@@ -10,6 +10,7 @@ use Psr\Clock\ClockInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Uid\Uuid;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Passkey\AbstractPasskeyAssertionVerifier;
 use ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyAssertionResultInterface;
 use ThreeBRS\EnterpriseSecurityBundle\Passkey\PasskeyCredentialRecordInterface;
@@ -30,7 +31,7 @@ class AbstractPasskeyAssertionVerifierTest extends TestCase
 {
     public function testSuccessfulAssertionWritesBackTheCheckedSourceAndResolvesTheUser(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $stored = $this->storedCredential($recorder);
 
         $verifier = $this->makeVerifier($recorder, storedCredential: $stored);
@@ -49,7 +50,7 @@ class AbstractPasskeyAssertionVerifierTest extends TestCase
 
     public function testConsumesTheOptionsUnderTheSubclassSessionKey(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $verifier = $this->makeVerifier($recorder);
 
         $verifier->verify('{"id":"cred"}', 'example.com');
@@ -59,7 +60,7 @@ class AbstractPasskeyAssertionVerifierTest extends TestCase
 
     public function testRejectsWhenNoCeremonyIsInProgress(): void
     {
-        $verifier = $this->makeVerifier(new \ArrayObject(), serializedOptions: null);
+        $verifier = $this->makeVerifier(new Recorder(), serializedOptions: null);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('No passkey assertion ceremony in progress.');
@@ -76,7 +77,7 @@ class AbstractPasskeyAssertionVerifierTest extends TestCase
             $this->createStub(AuthenticatorAttestationResponse::class),
         );
 
-        $verifier = $this->makeVerifier(new \ArrayObject(), credential: $credential);
+        $verifier = $this->makeVerifier(new Recorder(), credential: $credential);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected AuthenticatorAssertionResponse from client.');
@@ -85,7 +86,7 @@ class AbstractPasskeyAssertionVerifierTest extends TestCase
 
     public function testRejectsAnUnknownCredential(): void
     {
-        $verifier = $this->makeVerifier(new \ArrayObject(), storedCredential: false);
+        $verifier = $this->makeVerifier(new Recorder(), storedCredential: false);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Passkey credential not recognized.');

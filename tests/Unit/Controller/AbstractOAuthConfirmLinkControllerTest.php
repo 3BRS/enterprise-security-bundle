@@ -19,6 +19,7 @@ use Symfony\Component\Security\Core\Exception\DisabledException;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractOAuthConfirmLinkController;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthUserInfoInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\SocialAccountLinkRecordInterface;
@@ -39,7 +40,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testRendersFormAndPreparesChallengeOnGet(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController($recorder);
 
         $request = $this->requestWithSession();
@@ -57,7 +58,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testVerifiedChallengeOnPostLinksAndRedirects(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController($recorder);
 
         $request = $this->requestWithSession('POST', [
@@ -87,7 +88,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testFailedChallengeOnPostRendersErrorWithoutLinking(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController($recorder);
 
         $request = $this->requestWithSession('POST', [
@@ -108,7 +109,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testRedirectsToLoginWhenUserNotFound(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController($recorder);
 
         $request = $this->requestWithSession('POST', [
@@ -133,7 +134,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testExistingLinkOwnedByAnotherAccountIsRejectedWithoutLinking(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             $recorder,
             $this->createStub(SocialAccountLinkRecordInterface::class),
@@ -163,7 +164,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testExistingLinkOwnedBySameUserAuthenticatesWithoutRelinking(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             $recorder,
             $this->createStub(SocialAccountLinkRecordInterface::class),
@@ -187,7 +188,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testRefusesADisabledAccountWithoutLinkingOrAuthenticating(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             $recorder,
             userChecker: $this->refusingUserChecker(),
@@ -217,7 +218,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
 
     public function testRefusesADisabledAccountOnGetWithoutIssuingTheChallenge(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             $recorder,
             userChecker: $this->refusingUserChecker(),
@@ -285,7 +286,7 @@ class AbstractOAuthConfirmLinkControllerTest extends TestCase
         bool $linkOwnedByUser = false,
         ?UserCheckerInterface $userChecker = null,
     ): AbstractOAuthConfirmLinkController {
-        $recorder ??= new \ArrayObject();
+        $recorder ??= new Recorder();
         $userChecker ??= $this->createStub(UserCheckerInterface::class);
 
         $router = $this->createStub(RouterInterface::class);

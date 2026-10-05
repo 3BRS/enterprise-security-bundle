@@ -20,6 +20,7 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractTwoFactorDisableController;
 use ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuardInterface;
 
@@ -46,7 +47,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $token = $this->createStub(RememberMeToken::class);
         $token->method('getUser')->willReturn($this->totpUser());
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(token: $token, recorder: $recorder);
 
         $response = $controller($this->requestWithSession());
@@ -86,7 +87,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $totp = $this->createMock(TotpAuthenticatorInterface::class);
         $totp->expects(self::once())->method('checkCode')->with($user, '123456')->willReturn(true);
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(user: $user, totpAuthenticator: $totp, recorder: $recorder);
 
         $response = $controller($this->requestWithSession(' 123456 '));
@@ -101,7 +102,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $totp = $this->createStub(TotpAuthenticatorInterface::class);
         $totp->method('checkCode')->willReturn(false);
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             user: $this->totpUser(),
             totpAuthenticator: $totp,
@@ -119,7 +120,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $totp = $this->createStub(TotpAuthenticatorInterface::class);
         $totp->method('checkCode')->willReturn(false);
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(user: $this->totpUser(), totpAuthenticator: $totp, recorder: $recorder);
 
         $request = $this->requestWithSession('000000');
@@ -139,7 +140,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $guard = $this->createMock(RateLimitGuardInterface::class);
         $guard->expects(self::never())->method('consume');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(user: $this->totpUser(), totpAuthenticator: $totp, rateLimitGuard: $guard, recorder: $recorder);
 
         $controller($this->requestWithSession());
@@ -156,7 +157,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $totp = $this->createMock(TotpAuthenticatorInterface::class);
         $totp->expects(self::never())->method('checkCode');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(user: $user, totpAuthenticator: $totp, recorder: $recorder);
 
         $controller($this->requestWithSession('123456'));
@@ -202,7 +203,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
         $totp = $this->createMock(TotpAuthenticatorInterface::class);
         $totp->expects(self::never())->method('checkCode');
 
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(
             user: $this->totpUser(),
             totpAuthenticator: $totp,
@@ -295,7 +296,7 @@ class AbstractTwoFactorDisableControllerTest extends TestCase
 
         $router = $this->createStub(RouterInterface::class);
 
-        return new class($tokenStorage, $csrf, $router, $totpAuthenticator, $rateLimitGuard, $twoFactorCapable, $recorder ?? new \ArrayObject(), $validRecoveryCode, $rateLimitGroup) extends AbstractTwoFactorDisableController {
+        return new class($tokenStorage, $csrf, $router, $totpAuthenticator, $rateLimitGuard, $twoFactorCapable, $recorder ?? new Recorder(), $validRecoveryCode, $rateLimitGroup) extends AbstractTwoFactorDisableController {
             /**
              * @param \ArrayObject<string, mixed> $recorder
              */

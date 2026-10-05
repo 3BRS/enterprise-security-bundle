@@ -17,6 +17,7 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Core\Exception\DisabledException;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractTwoFactorRecoveryChallengeController;
 use Twig\Environment;
 
@@ -45,7 +46,7 @@ class AbstractTwoFactorRecoveryChallengeControllerTest extends TestCase
 
     public function testRedirectsOnSuccessfulRecovery(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $controller = $this->makeController(verifyReturns: true, recorder: $recorder);
 
         $request = Request::create('/', 'POST', [
@@ -62,7 +63,7 @@ class AbstractTwoFactorRecoveryChallengeControllerTest extends TestCase
     {
         // The account was disabled while its owner sat on the challenge: the half-authenticated
         // token must be dropped, and the recovery code the request carries must survive unspent.
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
 
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
         $tokenStorage->method('getToken')->willReturn($this->twoFactorToken());
@@ -116,7 +117,7 @@ class AbstractTwoFactorRecoveryChallengeControllerTest extends TestCase
         ?\ArrayObject $recorder = null,
     ): AbstractTwoFactorRecoveryChallengeController {
         $userChecker ??= $this->createStub(UserCheckerInterface::class);
-        $recorder ??= new \ArrayObject();
+        $recorder ??= new Recorder();
 
         if ($tokenStorage === null) {
             $tokenStorage = $this->createStub(TokenStorageInterface::class);

@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Session\AbstractNewDeviceDetector;
 use ThreeBRS\EnterpriseSecurityBundle\Session\KnownDeviceRecordInterface;
 
@@ -16,7 +17,7 @@ class AbstractNewDeviceDetectorTest extends TestCase
 {
     public function testUnknownDeviceIsReportedAsNewAndRemembered(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $detector = $this->makeDetector($recorder);
 
         self::assertTrue($detector->checkAndRemember(new TestUser('user-1'), 'fingerprint-1'));
@@ -27,7 +28,7 @@ class AbstractNewDeviceDetectorTest extends TestCase
 
     public function testKnownDeviceIsNotReportedAndNothingIsWritten(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $detector = $this->makeDetector($recorder, known: true);
 
         self::assertFalse($detector->checkAndRemember(new TestUser('user-1'), 'fingerprint-1'));
@@ -38,7 +39,7 @@ class AbstractNewDeviceDetectorTest extends TestCase
     {
         // The other request won the race and is sending the notification — this one must
         // report "not new" so the user does not get a second mail for the same sign-in.
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $detector = $this->makeDetector($recorder, saveFailure: new \RuntimeException('duplicate key'), conflict: true);
 
         self::assertFalse($detector->checkAndRemember(new TestUser('user-1'), 'fingerprint-1'));
@@ -50,7 +51,7 @@ class AbstractNewDeviceDetectorTest extends TestCase
         // Only a unique-key conflict means "someone else already remembered it". A dead
         // connection must not be reported to the caller as a known device.
         $failure = new \RuntimeException('connection lost');
-        $detector = $this->makeDetector(new \ArrayObject(), saveFailure: $failure, conflict: false);
+        $detector = $this->makeDetector(new Recorder(), saveFailure: $failure, conflict: false);
 
         $this->expectExceptionObject($failure);
         $detector->checkAndRemember(new TestUser('user-1'), 'fingerprint-1');

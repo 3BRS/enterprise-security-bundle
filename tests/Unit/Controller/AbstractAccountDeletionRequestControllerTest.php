@@ -21,6 +21,7 @@ use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestPasswordUser;
 use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Controller\Fixture\TestUser;
+use Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Fixture\Recorder;
 use ThreeBRS\EnterpriseSecurityBundle\Controller\AbstractAccountDeletionRequestController;
 use Twig\Environment;
 
@@ -67,7 +68,7 @@ class AbstractAccountDeletionRequestControllerTest extends TestCase
 
     public function testRefusesTheDeletionOnAWrongCurrentPassword(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
 
         $controller = $this->makeController(
             form: $this->submittedForm(hasPasswordField: true, providedPassword: 'wrong'),
@@ -92,7 +93,7 @@ class AbstractAccountDeletionRequestControllerTest extends TestCase
 
     public function testDispatchesTheDeletionAndSignsTheUserOutOnTheCorrectPassword(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $user = new TestPasswordUser();
 
         $tokenStorage = $this->createMock(TokenStorageInterface::class);
@@ -119,7 +120,7 @@ class AbstractAccountDeletionRequestControllerTest extends TestCase
 
     public function testHonoursAnOverriddenConfirmationSeamWithoutReadingThePasswordField(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
         $user = new TestUser();
 
         // A consumer that has no password field at all (e.g. password sign-in turned off) confirms
@@ -142,7 +143,7 @@ class AbstractAccountDeletionRequestControllerTest extends TestCase
 
     public function testDefaultConfirmationRefusesWhenTheFormCarriesNoPasswordField(): void
     {
-        $recorder = new \ArrayObject();
+        $recorder = new Recorder();
 
         // Dropping the field without overriding the seam is a consumer mistake — it must end in a
         // refusal, not a fatal error.
@@ -229,7 +230,7 @@ class AbstractAccountDeletionRequestControllerTest extends TestCase
         ?\ArrayObject $recorder = null,
     ): AbstractAccountDeletionRequestController {
         $user ??= new TestUser();
-        $recorder ??= new \ArrayObject();
+        $recorder ??= new Recorder();
         $passwordHasher ??= $this->createStub(UserPasswordHasherInterface::class);
 
         if ($tokenStorage === null) {
