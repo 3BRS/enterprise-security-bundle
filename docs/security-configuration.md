@@ -84,8 +84,20 @@ Make sure your `User` entity also implements scheb's `TwoFactorInterface` from `
 
 Wire `TwoFactorAwareAuthenticationSuccessHandler` on the firewall so your own success handler cannot short-circuit scheb's challenge for a user who has 2FA enabled.
 
+Scheb keeps a sign-in that waits for its code until the session expires. To end it when the user leaves the code page for another page of the firewall, wire `PendingSignInCanceller` and `CancelPendingSignInRequiredHandler` per firewall — see [Leaving the code page](features/two-factor-authentication.md#leaving-the-code-page).
+
 To make `enforced` mode bite — holding users who have *not* enrolled at the setup step — add the listener from [Controllers your app must provide §7](controllers-you-provide.md#7-two-factor-enforcement-listener); the success handler does not cover that case, because scheb only issues a two-factor token for users who are already enrolled.
 
 ## OAuth
 
 OAuth itself doesn't need security.yaml changes — the bundle's `AbstractOAuthCallbackController` handles the entire flow and manually sets the security token. Just register the bundle's `GoogleOAuthProvider`, `AppleOAuthProvider` and `MicrosoftOAuthProvider` services (or your own implementations) with the `three_brs.oauth_provider` tag and the bundle's registry picks them up.
+
+With two-factor authentication on the firewall, scheb lets a sign-in that waits for its code open only `PUBLIC_ACCESS` paths (plus the paths whose rule its token satisfies, and logout). Give the OAuth initiate, callback and confirm-link routes `PUBLIC_ACCESS` if a user on the code page should be able to sign in with a provider instead (paths as in [Routes](routes.md)):
+
+```yaml
+security:
+    access_control:
+        - { path: ^/oauth/, role: PUBLIC_ACCESS }
+```
+
+Linking stays closed on those routes: `AbstractOAuthInitiateController` and `AbstractOAuthCallbackController` link only after a full sign-in (`FullSignInGuardTrait`), and scheb's token is not one.

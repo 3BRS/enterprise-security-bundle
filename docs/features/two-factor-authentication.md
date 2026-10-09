@@ -7,15 +7,19 @@ TOTP-based 2FA (Google Authenticator, Authy, 1Password, …), built on top of [`
 **What it does:**
 - **Setup wizard** — enrols a user in TOTP from a QR code (or a typed-in secret), verifying a first code before switching 2FA on.
 - **Recovery codes** — a set of single-use backup codes issued at setup for when the authenticator is lost; the user can regenerate them later, which invalidates the previous set.
+- **Managing the second factor needs a full sign-in** — setup, disable and regenerating recovery codes redirect a sign-in that waits for its code or was restored from a remember-me cookie to the sign-in page (`FullSignInGuardTrait`).
+- **Disabling and regenerating recovery codes ask for a code** — the current TOTP code or a recovery code, rate-limited per user, so a hijacked session cannot switch 2FA off, nor take fresh recovery codes to do it with (once `AbstractTwoFactorDisableController` and `AbstractTwoFactorRegenerateRecoveryCodesController` get the TOTP authenticator, the rate-limit guard and your recovery-code check — see [Controllers](../controllers.md#authentication--two-factor)). There is no password check: accounts created through a social sign-in have none.
 - **Trusted device** — an optional "remember this device" cookie that skips the 2FA prompt on a known device; revocable per user by bumping `trustedTokenVersion` (which invalidates their trusted-device cookies).
 - **Per-scope enforcement policy** — a three-state mode (`disabled` / `allowed` / `enforced`) that `TwoFactorEnforcementChecker` turns into a yes/no per user. Acting on it is yours: a `kernel.request` listener holds un-enrolled users at the setup step in `enforced` mode, and your menu hides the feature when `disabled` — see [Controllers your app must provide §7](../controllers-you-provide.md#7-two-factor-enforcement-listener). Until you add them the mode is advisory and everyone can skip setup.
 - **Guards password login only.** The second factor is challenged on plain email + password sign-in; passwordless methods (OAuth, passkey, magic link) authenticate directly and bypass 2FA by design.
+- **Leaving the code page cancels the sign-in** (opt-in, per firewall). Scheb keeps a sign-in that waits for its code until the session expires and sends every page that is not public back to the code page; with the [canceller](#leaving-the-code-page) wired, a user who opens another page instead of entering the code gets that page, signed out.
 
 **Bundle primitives:**
 - `TotpSecretGenerator`, `QrCodeGenerator`, `RecoveryCodeGenerator` (each with an `*Interface`) — the setup building blocks.
 - `TwoFactorMode` enum — `disabled` / `allowed` / `enforced`.
 - `TwoFactorEnforcementChecker` (`TwoFactorEnforcementCheckerInterface`) — `shouldEnforceForShopUser()` / `shouldEnforceForAdminUser()` return true when the scope's mode is `enforced` **and** the user has not enabled 2FA. Use it to redirect such users to setup until they enrol.
-- `TwoFactorAwareAuthenticationSuccessHandler` — wraps your default success handler: if the post-login token is a scheb `TwoFactorTokenInterface` it hands off to scheb's "2FA required" handler (so the challenge UX is honoured), otherwise it delegates to the default handler. Without it, a default handler can short-circuit the 2FA challenge (e.g. redirect or return JSON straight away).
+- `TwoFactorAwareAuthenticationSuccessHandler` — wraps your default success handler: if the post-login token is a scheb `TwoFactorTokenInterface` it hands off to scheb's "2FA required" handler (so the challenge UX is honoured), otherwise it delegates to the default handler. Without it, a default handler can short-circuit the 2FA challenge (e.g. redirect or return JSON straight away). Symfony passes the firewall's success-handler options (`default_target_path`, `use_referer`, …) and its name to the wrapper, which hands them to a copy of the wrapped handler (`setOptions()` / `setFirewallName()`, when it has them) — so the saved target path and `default_target_path` keep working, and one default handler service can serve several firewalls.
+- `PendingSignInCanceller` (`PendingSignInCancellerInterface`) + `CancelPendingSignInRequiredHandler` — end a sign-in that waits for its code when the user leaves the code page; wired per firewall, see [Leaving the code page](#leaving-the-code-page).
 - Flow controllers (extend + bind): `AbstractTwoFactorSetupController`, `AbstractTwoFactorRecoveryChallengeController`, `AbstractTwoFactorDisableController`, `AbstractTwoFactorRegenerateRecoveryCodesController` — each one's abstract methods (its bind surface) are listed in [Controllers](../controllers.md#reference-abstract-controllers-and-their-bind-surface), and the extend/register/route pattern is in the [worked example](../controllers.md#example-passkey-login-verify-the-webauthn-assertion-endpoint).
 - User mixin: `TwoFactorAuthShopUserInterface` / `TwoFactorAuthAdminUserInterface` (store `totpSecret`, `twoFactorEnabled`, `trustedTokenVersion`). Your entity also implements scheb's `TwoFactorInterface` for the verification hook. Trusted devices are revoked per user by bumping `trustedTokenVersion`.
 
@@ -91,15 +95,59 @@ security:
                 success_handler: App\Security\AppTwoFactorSuccessHandler   # instance of the bundle handler
 ```
 
-Register the handler instance per firewall, wrapping scheb's required-handler and your default success handler:
+Register the handler instance per firewall, wrapping scheb's required-handler and a default success handler of its own. Do not pass `security.authentication.success_handler.main.form_login`: with `success_handler` set, that service is the one Symfony builds around this handler, so the reference would be circular.
 
 ```yaml
 services:
+    app.default_success_handler:
+        class: Symfony\Component\Security\Http\Authentication\DefaultAuthenticationSuccessHandler
+        arguments:
+            $httpUtils: '@security.http_utils'
+
     App\Security\AppTwoFactorSuccessHandler:
         class: ThreeBRS\EnterpriseSecurityBundle\TwoFactor\TwoFactorAwareAuthenticationSuccessHandler
         arguments:
             $twoFactorAuthenticationRequiredHandler: '@security.authentication.authentication_required_handler.two_factor.main'
-            $defaultSuccessHandler: '@security.authentication.success_handler.main.form_login'
+            $defaultSuccessHandler: '@app.default_success_handler'
 ```
 
-For **two firewalls**, repeat the firewall block and register a second handler instance bound to that firewall's scheb required-handler. See [Security configuration](../security-configuration.md#two-factor-authentication).
+The `form_login` options of the firewall (`default_target_path`, `use_referer`, …) reach `app.default_success_handler` through the wrapper, so they stay in `security.yaml`.
+
+For **two firewalls**, repeat the firewall block and register a second handler instance bound to that firewall's scheb required-handler; both can wrap the same default success handler. See [Security configuration](../security-configuration.md#two-factor-authentication).
+
+### Leaving the code page
+
+After the password, scheb stores its `TwoFactorToken` in the session and keeps it until the code is entered, the user signs out, or the session expires. Meanwhile it lets through `PUBLIC_ACCESS` paths, paths whose rule the token satisfies (such as `IS_AUTHENTICATED_2FA_IN_PROGRESS` on the code page) and logout, and sends every other page — including one with no `access_control` rule at all — back to the code page. A user who leaves the code page by clicking the logo, or comes back to the site later, keeps landing on it.
+
+`PendingSignInCanceller` and `CancelPendingSignInRequiredHandler` end such a sign-in once the user opens another page of the firewall after the code page was shown: the token is set to `null` and the page scheb saved to return to (`_security.<firewall>.target_path`) is removed.
+
+- **A page the sign-in may not open** — scheb calls its required handler, which `CancelPendingSignInRequiredHandler` decorates: it cancels and redirects to the requested address, which then opens without the sign-in.
+- **A `PUBLIC_ACCESS` page** (sign-in, registration, OAuth) — `PendingSignInCanceller` listens on `kernel.request` right after the firewall, cancels, and the request continues without the sign-in. The sign-in page (`$signInRoutes`) cancels even before the code page was shown.
+- **The two-factor pages** — scheb's code form and check path, plus the routes in `$twoFactorRoutes` (the recovery-code page) — never cancel.
+- **Only page loads cancel**: a safe method, not an XHR, `Sec-Fetch-Mode: navigate` and `Sec-Fetch-Dest: document` — or, from a browser that sends no `Sec-Fetch-*` (they go to secure origins only), an `Accept` that asks for `text/html` — and no prefetch (`Sec-Purpose`, `Purpose`, `X-Purpose`, `X-Moz: prefetch`). Background requests made from the code page keep the sign-in. So does navigation done with `fetch()` (Turbo Drive, htmx boost) on HTTPS: it is not a page load, so with such navigation the canceller does not cancel. Over plain HTTP, where browsers send no `Sec-Fetch-*`, a `fetch()` that asks for `text/html` counts as a page load.
+- **Only after the code page was shown.** Scheb's `FORM` event, on a page load of the code page, marks the token; requests before that do not cancel. That keeps the pages a sign-in passes through on its way to the code page — a redirect to a protected page after the password, a page opened by JavaScript after an XHR sign-in — from cancelling it.
+- **`PUBLIC_ACCESS` page loads read the session.** To find a pending sign-in, `PendingSignInCanceller` loads the token for every `PUBLIC_ACCESS` page load from a visitor who has a session cookie, and a lazy firewall then sends the response as `Cache-Control: private`. Visitors without a session cookie are not affected. Weigh it if you serve `PUBLIC_ACCESS` pages from an HTTP cache.
+
+It changes scheb's behaviour, so it is wired per firewall. Decorate scheb's `security.authentication.authentication_required_handler.two_factor.<firewall>` rather than setting the firewall's `two_factor.authentication_required_handler` option: with the option set scheb does not create that service, and the `TwoFactorAwareAuthenticationSuccessHandler` above is wired to it.
+
+```yaml
+services:
+    app.two_factor.pending_sign_in_canceller.main:
+        class: ThreeBRS\EnterpriseSecurityBundle\TwoFactor\PendingSignInCanceller
+        arguments:
+            $tokenStorage: '@security.token_storage'
+            $twoFactorAccessDecider: '@scheb_two_factor.security.access.access_decider'
+            $twoFactorFirewallConfig: '@security.firewall_config.two_factor.main'
+            $signInRoutes: ['app_login']
+            $twoFactorRoutes: ['app_2fa_recovery']
+        tags: ['kernel.event_subscriber']
+
+    app.two_factor.cancel_pending_sign_in_required_handler.main:
+        class: ThreeBRS\EnterpriseSecurityBundle\TwoFactor\CancelPendingSignInRequiredHandler
+        decorates: security.authentication.authentication_required_handler.two_factor.main
+        arguments:
+            $inner: '@.inner'
+            $pendingSignInCanceller: '@app.two_factor.pending_sign_in_canceller.main'
+```
+
+For a second firewall, register both services again with that firewall's name.

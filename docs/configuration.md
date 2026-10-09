@@ -6,9 +6,9 @@ The bundle reads a small amount of configuration from your Symfony container. Mo
 
 ## 1. Rate-limiter cache pool (auto-configured)
 
-The bundle pre-configures a dedicated cache pool `three_brs.rate_limiter.cache_pool` (backed by `cache.app`) and the `three_brs.rate_limiter.storage` service. **No action required** for the default setup.
+The bundle pre-configures a dedicated cache pool `three_brs.rate_limiter.cache_pool` (backed by `cache.app`) and the `three_brs.rate_limiter.storage` service, which keeps the rate-limit counters. On a single instance of the application no action is required.
 
-If you need a non-default backend (Redis / Memcached for clustered deployments), override the pool in your `config/packages/framework.yaml`:
+**With more than one instance, the pool must be shared** — Redis, Memcached or another backend every instance reaches. `cache.app` is a filesystem cache unless you configured it otherwise, so each instance would keep its own counters and a client whose requests are spread across instances gets the limit once per instance. Point `cache.app` at a shared backend, or override the pool alone in your `config/packages/framework.yaml`:
 
 ```yaml
 framework:

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ThreeBRS\EnterpriseSecurityBundle\Controller;
 
+use Scheb\TwoFactorBundle\Security\TwoFactor\Provider\Totp\TotpAuthenticatorInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,10 +14,25 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuardInterface;
 use ThreeBRS\EnterpriseSecurityBundle\TwoFactor\RecoveryCodeGeneratorInterface;
 
+/**
+ * Needs a full sign-in (FullSignInGuardTrait): the new recovery codes pass the second factor, so a
+ * sign-in restored from a remember-me cookie must not obtain them.
+ */
 abstract class AbstractTwoFactorRegenerateRecoveryCodesController
 {
+    use FlashHelperTrait;
+    use FullSignInGuardTrait;
+    use TwoFactorCodeConfirmationTrait;
+
+    /**
+     * With $totpAuthenticator, regenerating takes the current TOTP code, or a recovery code accepted by
+     * verifyRecoveryCode() (TwoFactorCodeConfirmationTrait); without it, the CSRF token alone. A new
+     * recovery code would otherwise confirm switching 2FA off. $rateLimitGuard counts the code attempts
+     * and is required together with $totpAuthenticator.
+     */
     public function __construct(
         protected TokenStorageInterface $tokenStorage,
         protected RecoveryCodeGeneratorInterface $recoveryGenerator,
@@ -24,13 +40,17 @@ abstract class AbstractTwoFactorRegenerateRecoveryCodesController
         protected RouterInterface $router,
         protected bool $recoveryCodesEnabled,
         protected int $recoveryCodesCount,
+        protected ?TotpAuthenticatorInterface $totpAuthenticator = null,
+        protected ?RateLimitGuardInterface $rateLimitGuard = null,
     ) {
+        $this->assertRateLimitGuardWithTotpAuthenticator();
     }
 
     public function __invoke(Request $request): Response
     {
-        $user = $this->tokenStorage->getToken()?->getUser();
-        if (! $user instanceof UserInterface || ! $this->isTwoFactorEnabledUser($user)) {
+        $token = $this->tokenStorage->getToken();
+        $user = $token?->getUser();
+        if (! $user instanceof UserInterface || ! $this->isFullSignIn($token) || ! $this->isTwoFactorEnabledUser($user)) {
             return new RedirectResponse($this->getLoginUrl());
         }
 
@@ -43,8 +63,14 @@ abstract class AbstractTwoFactorRegenerateRecoveryCodesController
             throw new BadRequestHttpException('Invalid CSRF token.');
         }
 
+        $refusal = $this->confirmCode($request, $user);
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $plainCodes = $this->recoveryGenerator->generate($this->getRecoveryCodesCount());
         $this->replaceRecoveryCodesAndCommit($user, $plainCodes);
+        $this->clearCodeAttempts($user);
 
         $request->getSession()->set($this->getPlainRecoveryCodesSessionKey(), $plainCodes);
 
@@ -83,5 +109,10 @@ abstract class AbstractTwoFactorRegenerateRecoveryCodesController
     protected function getRecoveryCodesCount(): int
     {
         return $this->recoveryCodesCount;
+    }
+
+    protected function getRedirectAfterRefusedCodeUrl(): string
+    {
+        return $this->getDashboardUrl();
     }
 }

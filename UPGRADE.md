@@ -189,3 +189,78 @@ your own copies of the same logic:
    catching the insert conflict (`isConcurrentInsertConflict()`), which is what keeps a user from
    getting two "new device" mails for one sign-in. Without the constraint it still works, it just
    loses that protection.
+
+## 2.3.0 → 2.4.0
+
+1. **Linking an OAuth account needs a full sign-in** (`FullSignInGuardTrait`). A sign-in that waits
+   for its two-factor code could link a provider account and so get past the code; that is closed in
+   `AbstractOAuthInitiateController` and `AbstractOAuthCallbackController` themselves.
+   - Pass the `Security` constructor argument to your `AbstractOAuthInitiateController` subclass
+     (`$security: '@security.helper'`) if you have not: without it every `intent=link` now ends in an
+     `AccessDeniedException`.
+   - A user signed in through a remember-me cookie who starts a link is sent to the sign-in page; the
+     firewall saves the link as the target path, which the default success handler returns them to.
+     To let them link without signing in again, override `isLinkAllowed()` in both subclasses with
+     `AuthenticatedVoter::IS_AUTHENTICATED_REMEMBERED`, which a sign-in waiting for its two-factor code
+     does not satisfy either.
+   - If you closed the hole yourself — `isAcceptableCurrentUser()` refusing a `TwoFactorTokenInterface`
+     in your callback subclass, `createStateCookie()` leaving the user out for one in your initiate
+     subclass — the overrides can go.
+   - With 2FA on the firewall, the OAuth routes can have `PUBLIC_ACCESS`, so that a user on the code
+     page can sign in with a provider instead; see
+     [Security configuration](docs/security-configuration.md#oauth).
+
+2. **Registering a passkey and managing the second factor need a full sign-in** too. A sign-in that
+   waits for its two-factor code or was restored from a remember-me cookie is refused:
+   `AbstractPasskeyRegistrationOptionsController` and `AbstractPasskeyRegistrationVerifyController`
+   answer `403`; `AbstractTwoFactorSetupController`, `AbstractTwoFactorDisableController` and
+   `AbstractTwoFactorRegenerateRecoveryCodesController` redirect to `getLoginUrl()`.
+   - Have your passkey registration UI tell a user who gets the `403` to sign in again.
+   - To let remember-me sign-ins register passkeys anyway, override
+     `isRegistrationAllowed(?TokenInterface $token)` in both subclasses.
+   - If a two-factor enforcement listener sends un-enrolled users to setup, let the sign-in page through
+     and make it show the form to a remember-me sign-in; see
+     [Controllers your app must provide §7](docs/controllers-you-provide.md#7-two-factor-enforcement-listener).
+
+3. **`TwoFactorAwareAuthenticationSuccessHandler` now forwards the firewall's `form_login` options**
+   (`default_target_path`, `use_referer`, …) and its name to the wrapped handler, so a user who signs
+   in without a 2FA challenge lands where the firewall says instead of on `/`. Nothing to change in
+   `security.yaml`. If you subclassed the handler only to forward them yourself, the subclass can go.
+   If your service definition passes `security.authentication.success_handler.<firewall>.form_login`
+   as `$defaultSuccessHandler`, replace it with a `DefaultAuthenticationSuccessHandler` service of
+   your own — see the [two-factor guide](docs/features/two-factor-authentication.md#scheb-wiring).
+
+4. **Optional: end a sign-in that waits for its two-factor code when the user leaves the code page.**
+   Nothing changes until you wire `PendingSignInCanceller` and `CancelPendingSignInRequiredHandler`
+   for a firewall — see
+   [Leaving the code page](docs/features/two-factor-authentication.md#leaving-the-code-page). If you
+   built the same thing in your app, it can go once these are wired.
+
+5. **Ask for a code before two-factor authentication is switched off or recovery codes are
+   regenerated.** `AbstractTwoFactorDisableController` and
+   `AbstractTwoFactorRegenerateRecoveryCodesController` still act on the CSRF token alone until you
+   wire the new optional constructor arguments in both — regenerate as well, or a freshly regenerated
+   recovery code confirms the disable:
+   - `$totpAuthenticator: '@scheb_two_factor.security.totp_authenticator'` — the POST then has to carry
+     the current TOTP code in `_code`. Add the field to the disable and regenerate forms on your 2FA
+     manage page.
+   - `$rateLimitGuard: '@ThreeBRS\EnterpriseSecurityBundle\RateLimit\RateLimitGuard'` together with it
+     (the constructor throws a `LogicException` otherwise) and an override of `getRateLimitGroup()`
+     returning `customer` or `admin`. Both controllers count under one `two_factor_code` action. The
+     limit needs no settings: while your store has no `rate_limit.two_factor_code.*`, the bundle counts
+     5 attempts per 15 minutes. If your settings defaults define the keys, default `enabled` to `true`;
+     `enabled: false` switches the limit off. If you register `DynamicRateLimiterFactory` yourself,
+     pass the bundle's `$actionDefaults` (see `src/Resources/config/services.yaml`) or this default is
+     lost.
+   - Override `verifyRecoveryCode(UserInterface $user, string $code): bool` to accept a recovery code
+     as well (the default refuses them); nothing needs to be consumed, the action deletes or replaces
+     them all.
+   - Override `getRedirectAfterRefusedCodeUrl()` to send a refused code back to the manage page (by
+     default disable goes where a successful disable does, regenerate to `getDashboardUrl()`), and
+     translate `three_brs.two_factor.confirmation_code_invalid` in the domain you render flashes in.
+   - If your subclass has its own constructor, add the two arguments to it and pass them on to
+     `parent::__construct()`.
+
+6. **Running more than one instance?** Make sure `three_brs.rate_limiter.cache_pool` is shared between
+   them. It sits on `cache.app`, a filesystem cache unless you configured it otherwise, and then every
+   instance counts its own rate limits — see [Configuration §1](docs/configuration.md#1-rate-limiter-cache-pool-auto-configured).

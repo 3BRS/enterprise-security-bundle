@@ -25,6 +25,7 @@ three_brs:
         cannot_revoke_current: 'You cannot sign out the current session this way. Use the sign-out link instead.'
     two_factor:
         disabled: 'Two-factor authentication has been disabled.'
+        confirmation_code_invalid: 'This code is invalid. Enter the current code from your authenticator app or an unused recovery code.'
     ui:
         magic_link:
             request_sent: 'If an account exists for the email you entered, a sign-in link has been sent.'

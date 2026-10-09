@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Core\Authentication\Token\RememberMeToken;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -35,6 +36,17 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
         $controller = $this->makeController(acceptUser: false);
 
         $response = $controller($this->requestWithSession());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/login', $response->getTargetUrl());
+    }
+
+    public function testRedirectsASignInRestoredFromARememberMeCookieToLogin(): void
+    {
+        $token = $this->createStub(RememberMeToken::class);
+        $token->method('getUser')->willReturn(new TestUser());
+
+        $response = $this->makeController(token: $token)($this->requestWithSession());
 
         self::assertInstanceOf(RedirectResponse::class, $response);
         self::assertSame('/login', $response->getTargetUrl());
@@ -144,9 +156,12 @@ class AbstractTwoFactorSetupControllerTest extends TestCase
         array &$templateCapture = [],
         ?string $overrideIssuer = null,
         ?string &$issuerCapture = null,
+        ?TokenInterface $token = null,
     ): AbstractTwoFactorSetupController {
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn(new TestUser());
+        if ($token === null) {
+            $token = $this->createStub(TokenInterface::class);
+            $token->method('getUser')->willReturn(new TestUser());
+        }
 
         $tokenStorage = $this->createStub(TokenStorageInterface::class);
         $tokenStorage->method('getToken')->willReturn($token);

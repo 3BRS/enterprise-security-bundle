@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\Exception\OAuthProviderException;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\FormPostOAuthProviderInterface;
 use ThreeBRS\EnterpriseSecurityBundle\OAuth\OAuthProviderInterface;
@@ -18,6 +19,8 @@ use ThreeBRS\EnterpriseSecurityBundle\OAuth\StateCookieSignerInterface;
 
 abstract class AbstractOAuthInitiateController
 {
+    use FullSignInGuardTrait;
+
     protected const STATE_COOKIE_LIFETIME = 600;
 
     public function __construct(
@@ -39,14 +42,20 @@ abstract class AbstractOAuthInitiateController
             throw new OAuthProviderException(sprintf('OAuth provider "%s" is disabled for %s.', $provider, $this->getOAuthGroup()));
         }
 
-        $state = bin2hex(random_bytes(16));
-        $session = $request->getSession();
-        $session->set($this->getStateSessionKey() . '_' . $provider, $state);
-
         $intent = $request->query->getString('intent', 'login');
         if (! in_array($intent, ['login', 'link'], true)) {
             $intent = 'login';
         }
+
+        // The firewall answers this with the sign-in page, or with the code page while a sign-in
+        // waits for its two-factor code.
+        if ($intent === 'link' && ! $this->isLinkAllowed()) {
+            throw new AccessDeniedException('Linking an account requires a full sign-in.');
+        }
+
+        $state = bin2hex(random_bytes(16));
+        $session = $request->getSession();
+        $session->set($this->getStateSessionKey() . '_' . $provider, $state);
         $session->set($this->getIntentSessionKey(), $intent);
 
         $redirectUri = $this->router->generate(
@@ -81,11 +90,11 @@ abstract class AbstractOAuthInitiateController
             'intent' => $intent,
         ];
 
-        // A link is started by an authenticated user, but that identity is read from the
+        // A link is started by a fully signed-in user, but that identity is read from the
         // session — which is absent on the cross-site form_post callback. Carry the user's
         // identifier so the callback can still resolve them. (Login needs no user here.)
-        if ($intent === 'link' && $this->security !== null) {
-            $user = $this->security->getUser();
+        if ($intent === 'link' && $this->isLinkAllowed()) {
+            $user = $this->security?->getUser();
             if ($user !== null) {
                 $payload['user'] = $user->getUserIdentifier();
             }
@@ -102,6 +111,15 @@ abstract class AbstractOAuthInitiateController
             false,
             Cookie::SAMESITE_NONE,
         );
+    }
+
+    /**
+     * Linking adds a way to sign in to the account, so it needs a full sign-in (FullSignInGuardTrait).
+     * Without the Security service no link is allowed.
+     */
+    protected function isLinkAllowed(): bool
+    {
+        return $this->isFullSignIn($this->security?->getToken());
     }
 
     abstract protected function isProviderEnabledForScope(OAuthProviderInterface $provider): bool;

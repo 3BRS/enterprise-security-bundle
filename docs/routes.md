@@ -20,8 +20,8 @@ URLs are up to you — these are the controllers and the typical HTTP verbs. Pic
 | `AbstractSocialAccountUnlinkController` | POST | `/account/social/{provider}/unlink` | CSRF-protected unlink |
 | `AbstractTwoFactorSetupController` | GET, POST | `/account/two-factor` | Setup wizard / manage |
 | `AbstractTwoFactorRecoveryChallengeController` | GET, POST | `/2fa/recovery` | Login completion via recovery code |
-| `AbstractTwoFactorDisableController` | POST | `/account/two-factor/disable` | CSRF-protected disable |
-| `AbstractTwoFactorRegenerateRecoveryCodesController` | POST | `/account/two-factor/regenerate` | CSRF-protected regenerate |
+| `AbstractTwoFactorDisableController` | POST | `/account/two-factor/disable` | CSRF + current TOTP or recovery code (`_code`) |
+| `AbstractTwoFactorRegenerateRecoveryCodesController` | POST | `/account/two-factor/regenerate` | CSRF + current TOTP or recovery code (`_code`) |
 | `AbstractSessionsListController` | GET | `/account/sessions` | List active sessions |
 | `AbstractSessionRevokeController` | POST | `/account/sessions/{id}/revoke` | CSRF-protected |
 | `AbstractSessionRevokeOthersController` | POST | `/account/sessions/revoke-others` | CSRF-protected |

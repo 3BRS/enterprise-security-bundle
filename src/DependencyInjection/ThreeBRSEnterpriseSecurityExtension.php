@@ -20,14 +20,11 @@ class ThreeBRSEnterpriseSecurityExtension extends Extension implements PrependEx
         // (DynamicRateLimiterFactory builds limiters at request time from DB-backed
         // settings), so the bundle ships its own pool and pins the storage to it.
         //
-        // We back it with `cache.app` (not `cache.adapter.filesystem`) because
-        // multi-pod deployments (Kubernetes, autoscaled containers) do not share
-        // a filesystem — each pod would have its own counters and an attacker
-        // could just retry on a different replica to bypass the limit. In a
-        // single-instance deployment cache.app defaults to filesystem and the
-        // behaviour is identical; in a clustered setup the app already needs
-        // cache.app pointing at a shared backend (Redis / Memcached) for
-        // Symfony's session, doctrine cache, etc. — we piggyback on that.
+        // The pool sits on `cache.app`, so it follows whatever backend the application gives that.
+        // `cache.app` is a filesystem cache unless configured otherwise; with more than one instance
+        // of the application it — or this pool — has to point at a shared backend (Redis, Memcached),
+        // or each instance keeps its own counters and a client spreading its requests across them
+        // gets the limit once per instance. See docs/configuration.md.
         $container->prependExtensionConfig('framework', [
             'cache' => [
                 'pools' => [
