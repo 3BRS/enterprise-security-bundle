@@ -3,6 +3,20 @@
 Notable changes to `3brs/enterprise-security-bundle`. Follows
 [Keep a Changelog](https://keepachangelog.com/) and [SemVer](https://semver.org/).
 
+## [2.5.0] - 2026-10-12
+
+### Added
+- **Symfony 8 support.** The Symfony component requirements allow `^8.0`, and so do
+  `scheb/2fa-bundle`, `scheb/2fa-totp` and `scheb/2fa-trusted-device`: scheb 7 does not install with
+  Symfony 8, scheb 8 needs PHP 8.4 and installs with Symfony 7.4 as well. Symfony 6.4 and 7.4 with
+  scheb 7 stay supported — see [UPGRADE.md](UPGRADE.md#240--250).
+- **`PasswordPolicy`, `PasswordHistory` and `CidrList` take their options as named arguments.**
+  Symfony 8 builds constraints from XML and YAML mappings with named arguments and no longer reads an
+  options array in the base `Constraint` class: a mapping that sets `policyGroup` fails there, and
+  `new PasswordPolicy(['policyGroup' => 'admin'])` validates against the customer policy. The
+  constraints now have constructors marked `#[HasNamedArguments]`, and an options array keeps working
+  on every Symfony version.
+
 ## [2.4.0] - 2026-10-02
 
 ### Security
@@ -351,6 +365,7 @@ Documentation-only corrections, of statements that promised a guarantee the code
 ## [1.0.0] - 2026-06-15
 - Initial release.
 
+[2.5.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.3.0...v2.4.0
 [2.1.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/3BRS/enterprise-security-bundle/compare/v1.1.0...v2.0.0

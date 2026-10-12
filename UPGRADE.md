@@ -264,3 +264,16 @@ your own copies of the same logic:
 6. **Running more than one instance?** Make sure `three_brs.rate_limiter.cache_pool` is shared between
    them. It sits on `cache.app`, a filesystem cache unless you configured it otherwise, and then every
    instance counts its own rate limits — see [Configuration §1](docs/configuration.md#1-rate-limiter-cache-pool-auto-configured).
+
+## 2.4.0 → 2.5.0
+
+The bundle now also allows `scheb/2fa-*` 8, which needs PHP 8.4 and Symfony 7.4 or 8. On PHP 8.4,
+`composer update` therefore moves scheb to 8 with Symfony 7.4 as well; to stay on scheb 7 there,
+require `scheb/2fa-bundle` `^7.13` in your application. Two of scheb 8's
+[changes](https://github.com/scheb/2fa/blob/8.x/UPGRADE.md#7x-to-8x) can reach your own code:
+
+1. **The two-factor authenticator runs at priority `-100`** instead of `0`. If you register
+   authenticators of your own, check that they still run in the order you expect.
+
+2. **On Symfony 8, `UserTotpCode` and `UserGoogleTotpCode` take named arguments** instead of an
+   options array: `new UserTotpCode(message: '…')`.
