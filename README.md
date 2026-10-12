@@ -19,7 +19,7 @@
 
 A standalone Symfony bundle providing reusable security primitives — two-factor authentication, passkeys (WebAuthn/FIDO2), magic-link login, OAuth (Google, Apple, Microsoft), account lockout with rate limiting, session tracking, IP whitelist/blacklist, password policy / history / expiration, scope-wide password-login control, GDPR self-service account deletion, and a runtime-configurable settings store.
 
-The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 app. It ships **contracts and abstract flows, not a wired-up UI** — you bind it to your app's entities, routes and templates. See the [integration guide](#integration-guide) below for how to wire it into a Symfony project.
+The bundle is framework-agnostic — drop it into any Symfony 6.4 / 7.4 / 8 app. It ships **contracts and abstract flows, not a wired-up UI** — you bind it to your app's entities, routes and templates. See the [integration guide](#integration-guide) below for how to wire it into a Symfony project.
 
 ---
 
@@ -81,8 +81,8 @@ The bundle covers 16 security features. Each row maps the feature to the bundle 
 
 ## Requirements
 
-- PHP 8.3+
-- Symfony 6.4 or 7.4
+- PHP 8.3+ (8.4+ with Symfony 8)
+- Symfony 6.4, 7.4 or 8
 - A Doctrine ORM (the bundle itself has no ORM dep, but your app needs one to persist sessions, passkey credentials, magic-link tokens, etc.)
 - A user entity implementing `Symfony\Component\Security\Core\User\UserInterface`
 

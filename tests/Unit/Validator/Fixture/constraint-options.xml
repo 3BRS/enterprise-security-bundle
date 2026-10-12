@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<constraint-mapping xmlns="http://symfony.com/schema/dic/constraint-mapping"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://symfony.com/schema/dic/constraint-mapping
+        https://symfony.com/schema/dic/constraint-mapping/constraint-mapping-1.0.xsd">
+
+    <class name="Tests\ThreeBRS\EnterpriseSecurityBundle\Unit\Validator\Fixture\ConstraintOptionsSubject">
+        <property name="password">
+            <constraint name="ThreeBRS\EnterpriseSecurityBundle\PasswordPolicy\Constraint\PasswordPolicy">
+                <option name="policyGroup">admin</option>
+                <option name="groups">
+                    <value>sylius</value>
+                </option>
+            </constraint>
+            <constraint name="ThreeBRS\EnterpriseSecurityBundle\PasswordHistory\Constraint\PasswordHistory">
+                <option name="message">reused</option>
+                <option name="groups">
+                    <value>sylius</value>
+                </option>
+            </constraint>
+        </property>
+        <property name="cidrs">
+            <constraint name="ThreeBRS\EnterpriseSecurityBundle\Validator\Constraint\CidrList">
+                <option name="invalidMessage">invalid</option>
+            </constraint>
+        </property>
+    </class>
+</constraint-mapping>
